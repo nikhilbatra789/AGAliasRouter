@@ -1,0 +1,17 @@
+name: ag-aliasrouter
+
+services:
+  ag-aliasrouter:
+    container_name: ag-aliasrouter
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${PORT:-9001}:9001"
+    volumes:
+      - ${CONFIG_DIR:-./config}:/app/config
+      - ${LOGS_DIR:-./logs}:/app/logs
+    environment:
+      - NODE_ENV=production
+      - PORT=9001
+    restart: unless-stopped

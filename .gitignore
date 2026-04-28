@@ -1,0 +1,16 @@
+node_modules/
+.next/
+out/
+dist/
+coverage/
+test-results/
+playwright-report/
+*.log
+*.tsbuildinfo
+.env*
+!.env.example
+.DS_Store
+
+# Runtime local state (do not commit secrets or local logs)
+config/
+logs/

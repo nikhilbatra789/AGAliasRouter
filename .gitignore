@@ -12,5 +12,5 @@ playwright-report/
 .DS_Store
 
 # Runtime local state (do not commit secrets or local logs)
-config/
-logs/
+/config/
+/logs/

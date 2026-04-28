@@ -9,7 +9,8 @@ export const mockAppConfig: AppConfig = {
   unhealthyIntervalMinutes: 60,
   healthyModelsIntervalMinutes: 360,
   unhealthyModelsIntervalMinutes: 15,
-  retentionIntervalMinutes: 60
+  retentionIntervalMinutes: 60,
+  healthCheckTimeoutSeconds: 60
 };
 
 export const mockDashboardMetrics: DashboardMetrics = {

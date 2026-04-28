@@ -327,6 +327,7 @@ export function ConfigurationPage() {
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [apiKeyVisible, setApiKeyVisible] = useState(false);
   const [apiKeyEditing, setApiKeyEditing] = useState(false);
+  const [apiKeyCopied, setApiKeyCopied] = useState(false);
   const [adminUsername, setAdminUsername] = useState('');
   const [adminPass, setAdminPass] = useState('');
   const [adminPassConfirm, setAdminPassConfirm] = useState('');
@@ -336,7 +337,8 @@ export function ConfigurationPage() {
     unhealthyIntervalMinutes: '60',
     healthyModelsIntervalMinutes: '360',
     unhealthyModelsIntervalMinutes: '15',
-    retentionIntervalMinutes: '60'
+    retentionIntervalMinutes: '60',
+    healthCheckTimeoutSeconds: '60'
   });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -352,7 +354,8 @@ export function ConfigurationPage() {
           unhealthyIntervalMinutes: String(response.data.unhealthyIntervalMinutes),
           healthyModelsIntervalMinutes: String(response.data.healthyModelsIntervalMinutes),
           unhealthyModelsIntervalMinutes: String(response.data.unhealthyModelsIntervalMinutes),
-          retentionIntervalMinutes: String(response.data.retentionIntervalMinutes)
+          retentionIntervalMinutes: String(response.data.retentionIntervalMinutes),
+          healthCheckTimeoutSeconds: String(response.data.healthCheckTimeoutSeconds)
         });
       }
     });
@@ -385,7 +388,25 @@ export function ConfigurationPage() {
     return parsed;
   }
 
-  const timerFormValid = Object.values(timerConfig).every((value) => parseTimerValue(value) !== null);
+  const timerFormValid = [
+    timerConfig.cacheIntervalMinutes,
+    timerConfig.degradedIntervalMinutes,
+    timerConfig.unhealthyIntervalMinutes,
+    timerConfig.healthyModelsIntervalMinutes,
+    timerConfig.unhealthyModelsIntervalMinutes,
+    timerConfig.retentionIntervalMinutes
+  ].every((value) => parseTimerValue(value) !== null);
+
+  async function copyApiKey() {
+    if (!config?.sharedApiKey) return;
+    try {
+      await navigator.clipboard.writeText(config.sharedApiKey);
+      setApiKeyCopied(true);
+      window.setTimeout(() => setApiKeyCopied(false), 1400);
+    } catch {
+      setError('Could not copy API key.');
+    }
+  }
 
   return (
     <div style={{ maxWidth: 780, margin: '0 auto' }}>
@@ -399,6 +420,7 @@ export function ConfigurationPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderRadius: 6, border: '1px solid #e6e8ea', background: '#f7f9fb' }}>
                 <span className="material-symbols-outlined" style={{ fontSize: 16, color: '#9aa0ab', flexShrink: 0 }}>key</span>
                 <code style={{ flex: 1, font: '500 13px/20px "Space Grotesk"', color: '#424750', letterSpacing: '.04em', wordBreak: 'break-all' }}>{apiKeyVisible ? config?.sharedApiKey : config?.sharedApiKeyMasked.replace(/./g, (c, i) => i < 2 ? c : '•')}</code>
+                <button type="button" onClick={() => void copyApiKey()} aria-label="Copy API key" style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: apiKeyCopied ? '#10b981' : '#737781', padding: '0 6px', display: 'inline-flex', alignItems: 'center' }}><span className="material-symbols-outlined" style={{ fontSize: 18 }}>{apiKeyCopied ? 'check' : 'content_copy'}</span></button>
                 <button type="button" onClick={() => setApiKeyVisible((value) => !value)} aria-label={apiKeyVisible ? 'Hide API key' : 'Reveal API key'} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#737781', padding: '0 6px', display: 'inline-flex', alignItems: 'center' }}><span className="material-symbols-outlined" style={{ fontSize: 18 }}>{apiKeyVisible ? 'visibility_off' : 'visibility'}</span></button>
               </div>
             </div>
@@ -428,18 +450,18 @@ export function ConfigurationPage() {
           </div>
         </div>
         <div style={sectionCard}>
-          <div style={sectionHeader}><div style={{ width: 36, height: 36, borderRadius: 8, background: '#eef3fb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><span className="material-symbols-outlined" style={{ fontSize: 20, color: '#0f457c' }}>timer</span></div><div><div style={{ font: '600 15px/20px Inter', color: '#191c1e' }}>Runtime Timers</div><div style={{ font: '400 12px/18px Inter', color: '#737781', marginTop: 2 }}>Intervals in minutes for background jobs.</div></div></div>
+          <div style={sectionHeader}><div style={{ width: 36, height: 36, borderRadius: 8, background: '#eef3fb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><span className="material-symbols-outlined" style={{ fontSize: 20, color: '#0f457c' }}>timer</span></div><div><div style={{ font: '600 15px/20px Inter', color: '#191c1e' }}>Runtime Timers</div><div style={{ font: '400 12px/18px Inter', color: '#737781', marginTop: 2 }}>Background job intervals.</div></div></div>
           <div style={sectionBody}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
-              <div><label style={labelStyle}>Models Cache Refresh</label><input style={inputStyle} inputMode="numeric" value={timerConfig.cacheIntervalMinutes} onChange={(event) => setTimerConfig((current) => ({ ...current, cacheIntervalMinutes: event.target.value }))} /></div>
-              <div><label style={labelStyle}>Degraded Provider Check</label><input style={inputStyle} inputMode="numeric" value={timerConfig.degradedIntervalMinutes} onChange={(event) => setTimerConfig((current) => ({ ...current, degradedIntervalMinutes: event.target.value }))} /></div>
-              <div><label style={labelStyle}>Unhealthy/Failed Provider Check</label><input style={inputStyle} inputMode="numeric" value={timerConfig.unhealthyIntervalMinutes} onChange={(event) => setTimerConfig((current) => ({ ...current, unhealthyIntervalMinutes: event.target.value }))} /></div>
-              <div><label style={labelStyle}>Healthy Model Mapping Check</label><input style={inputStyle} inputMode="numeric" value={timerConfig.healthyModelsIntervalMinutes} onChange={(event) => setTimerConfig((current) => ({ ...current, healthyModelsIntervalMinutes: event.target.value }))} /></div>
-              <div><label style={labelStyle}>Unhealthy/Failed Model Mapping Check</label><input style={inputStyle} inputMode="numeric" value={timerConfig.unhealthyModelsIntervalMinutes} onChange={(event) => setTimerConfig((current) => ({ ...current, unhealthyModelsIntervalMinutes: event.target.value }))} /></div>
-              <div><label style={labelStyle}>Logs Retention Sweep</label><input style={inputStyle} inputMode="numeric" value={timerConfig.retentionIntervalMinutes} onChange={(event) => setTimerConfig((current) => ({ ...current, retentionIntervalMinutes: event.target.value }))} /></div>
+              <div><label style={labelStyle}>Models Cache Refresh (mins)</label><input style={inputStyle} inputMode="numeric" value={timerConfig.cacheIntervalMinutes} onChange={(event) => setTimerConfig((current) => ({ ...current, cacheIntervalMinutes: event.target.value }))} /></div>
+              <div><label style={labelStyle}>Degraded Provider Check (mins)</label><input style={inputStyle} inputMode="numeric" value={timerConfig.degradedIntervalMinutes} onChange={(event) => setTimerConfig((current) => ({ ...current, degradedIntervalMinutes: event.target.value }))} /></div>
+              <div><label style={labelStyle}>Unhealthy/Failed Provider Check (mins)</label><input style={inputStyle} inputMode="numeric" value={timerConfig.unhealthyIntervalMinutes} onChange={(event) => setTimerConfig((current) => ({ ...current, unhealthyIntervalMinutes: event.target.value }))} /></div>
+              <div><label style={labelStyle}>Healthy Model Mapping Check (mins)</label><input style={inputStyle} inputMode="numeric" value={timerConfig.healthyModelsIntervalMinutes} onChange={(event) => setTimerConfig((current) => ({ ...current, healthyModelsIntervalMinutes: event.target.value }))} /></div>
+              <div><label style={labelStyle}>Unhealthy/Failed Model Mapping Check (mins)</label><input style={inputStyle} inputMode="numeric" value={timerConfig.unhealthyModelsIntervalMinutes} onChange={(event) => setTimerConfig((current) => ({ ...current, unhealthyModelsIntervalMinutes: event.target.value }))} /></div>
+              <div><label style={labelStyle}>Logs Retention Sweep (mins)</label><input style={inputStyle} inputMode="numeric" value={timerConfig.retentionIntervalMinutes} onChange={(event) => setTimerConfig((current) => ({ ...current, retentionIntervalMinutes: event.target.value }))} /></div>
             </div>
             <div style={{ marginTop: 14, font: '400 12px/18px Inter', color: '#737781' }}>
-              Values are in minutes and must be positive integers.
+              Timer values are in minutes and must be positive integers.
             </div>
             <div style={{ marginTop: 16 }}>
               <Button
@@ -458,6 +480,31 @@ export function ConfigurationPage() {
                 }}
               >
                 Save Runtime Timers
+              </Button>
+            </div>
+          </div>
+        </div>
+        <div style={sectionCard}>
+          <div style={sectionHeader}><div style={{ width: 36, height: 36, borderRadius: 8, background: '#fff7ed', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><span className="material-symbols-outlined" style={{ fontSize: 20, color: '#c2410c' }}>hourglass_top</span></div><div><div style={{ font: '600 15px/20px Inter', color: '#191c1e' }}>Health Check Timeout</div><div style={{ font: '400 12px/18px Inter', color: '#737781', marginTop: 2 }}>Timeout for provider and model health-check requests.</div></div></div>
+          <div style={sectionBody}>
+            <div style={{ maxWidth: 260 }}>
+              <label style={labelStyle}>Health Check Timeout (secs)</label>
+              <input style={inputStyle} inputMode="numeric" value={timerConfig.healthCheckTimeoutSeconds} onChange={(event) => setTimerConfig((current) => ({ ...current, healthCheckTimeoutSeconds: event.target.value }))} />
+            </div>
+            <div style={{ marginTop: 14, font: '400 12px/18px Inter', color: '#737781' }}>
+              Value is in seconds and must be a positive integer. Default is 60 seconds.
+            </div>
+            <div style={{ marginTop: 16 }}>
+              <Button
+                icon="save"
+                disabled={parseTimerValue(timerConfig.healthCheckTimeoutSeconds) === null}
+                onClick={() => {
+                  void saveConfig({
+                    healthCheckTimeoutSeconds: parseTimerValue(timerConfig.healthCheckTimeoutSeconds) || 60
+                  });
+                }}
+              >
+                Save Health Timeout
               </Button>
             </div>
           </div>
@@ -871,6 +918,105 @@ function LightSelect({ value, onChange, options, disabled = false }: { value: st
   );
 }
 
+function SearchableSelect({ value, onChange, options, disabled = false, placeholder = 'Search...' }: { value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }>; disabled?: boolean; placeholder?: string }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const selected = options.find((option) => option.value === value);
+  const filteredOptions = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return options;
+    return options.filter((option) => `${option.label} ${option.value}`.toLowerCase().includes(normalized));
+  }, [options, query]);
+
+  useEffect(() => {
+    if (!open) return;
+    function closeOnOutsideClick(event: MouseEvent) {
+      if (!wrapperRef.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    window.addEventListener('mousedown', closeOnOutsideClick);
+    return () => window.removeEventListener('mousedown', closeOnOutsideClick);
+  }, [open]);
+
+  return (
+    <div ref={wrapperRef} style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => {
+          if (disabled) return;
+          setOpen((current) => !current);
+          setQuery('');
+        }}
+        style={{
+          width: '100%',
+          minHeight: 34,
+          background: disabled ? '#f7f9fb' : '#fff',
+          border: '1px solid #c2c6d1',
+          borderRadius: 5,
+          color: selected?.value ? '#191c1e' : '#737781',
+          font: '400 13px/18px Inter',
+          padding: '7px 32px 7px 10px',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          outline: 'none',
+          textAlign: 'left',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap'
+        }}
+      >
+        {selected?.label || options[0]?.label || 'No options'}
+      </button>
+      <span className="material-symbols-outlined" style={{ position: 'absolute', right: 8, top: 17, transform: 'translateY(-50%)', fontSize: 16, color: '#737781', pointerEvents: 'none' }}>expand_more</span>
+      {open && (
+        <div style={{ position: 'absolute', left: 0, right: 0, top: 'calc(100% + 4px)', zIndex: 50, background: '#fff', border: '1px solid #c2c6d1', borderRadius: 6, boxShadow: '0 12px 28px rgba(15, 23, 42, .14)', padding: 8 }}>
+          <input
+            autoFocus
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={placeholder}
+            style={{ width: '100%', border: '1px solid #0f62fe', outline: '2px solid rgba(15, 98, 254, .18)', borderRadius: 5, padding: '8px 10px', font: '400 13px/18px Inter', color: '#191c1e', marginBottom: 6 }}
+          />
+          <div style={{ maxHeight: 240, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+            {filteredOptions.length ? filteredOptions.map((option) => {
+              const selectable = Boolean(option.value);
+              return (
+                <button
+                  type="button"
+                  key={`${option.value}-${option.label}`}
+                  disabled={!selectable}
+                  onClick={() => {
+                    if (!selectable) return;
+                    onChange(option.value);
+                    setOpen(false);
+                    setQuery('');
+                  }}
+                  style={{
+                    border: 'none',
+                    background: option.value === value ? '#eef3fb' : 'transparent',
+                    color: selectable ? '#191c1e' : '#737781',
+                    cursor: selectable ? 'pointer' : 'default',
+                    textAlign: 'left',
+                    padding: '8px 10px',
+                    borderRadius: 4,
+                    font: '400 13px/18px Inter'
+                  }}
+                >
+                  {option.label}
+                </button>
+              );
+            }) : (
+              <div style={{ padding: '8px 10px', font: '400 13px/18px Inter', color: '#737781' }}>No matches</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ModelMappingsPage() {
   const [mappings, setMappings] = useState<ModelMapping[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -1182,7 +1328,7 @@ export function ModelMappingsPage() {
         </div>
       </div>
       {mappings.map((mapping) => (
-        <div key={mapping.id} style={{ background: '#fff', border: '1px solid #c2c6d1', borderRadius: 8, overflow: 'hidden', marginBottom: 20, boxShadow: '0 1px 3px rgba(0,0,0,.05)' }}>
+        <div key={mapping.id} style={{ background: '#fff', border: '1px solid #c2c6d1', borderRadius: 8, overflow: 'visible', marginBottom: 20, boxShadow: '0 1px 3px rgba(0,0,0,.05)' }}>
           <div style={{ padding: '18px 20px 14px', display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'flex-end', gap: 20, flexWrap: 'wrap' }}>
               <div style={{ flex: 1, minWidth: 200 }}><label style={{ display: 'block', font: '500 11px/16px "Space Grotesk"', letterSpacing: '.06em', textTransform: 'uppercase', color: '#737781', marginBottom: 6 }}>Custom Model Name</label><input value={mapping.publicModelName} onChange={(event) => updateMapping(mapping.id, { publicModelName: event.target.value })} style={{ width: '100%', background: '#fff', border: '1px solid #c2c6d1', borderRadius: 5, color: '#191c1e', font: '400 14px/20px Inter', padding: '8px 12px', outline: 'none' }} /></div>
@@ -1225,8 +1371,8 @@ export function ModelMappingsPage() {
                   </span>
                   <button disabled={index === mapping.rows.length - 1} onClick={() => updateMapping(mapping.id, { rows: mapping.rows.map((item, i, arr) => i === index ? arr[index + 1] : i === index + 1 ? row : item) })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9aa0ab' }}><span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_drop_down</span></button>
                 </div>
-                <LightSelect value={row.providerUuid} options={providerOptions.length ? providerOptions : [{ value: '', label: 'No providers available' }]} disabled={!providerOptions.length} onChange={(uuid) => { const provider = providers.find((item) => item.uuid === uuid); if (provider) applyProviderToRow(mapping.id, row.id, provider); }} />
-                <LightSelect value={selectedModelValue} options={selectedModelOptions} disabled={!selectedProvider || !selectedModelOptions.some((option) => option.value)} onChange={(value) => updateRow(mapping, row.id, { upstreamModelName: value })} />
+                <SearchableSelect value={row.providerUuid} options={providerOptions.length ? providerOptions : [{ value: '', label: 'No providers available' }]} disabled={!providerOptions.length} placeholder="Search providers" onChange={(uuid) => { const provider = providers.find((item) => item.uuid === uuid); if (provider) applyProviderToRow(mapping.id, row.id, provider); }} />
+                <SearchableSelect value={selectedModelValue} options={selectedModelOptions} disabled={!selectedProvider || !selectedModelOptions.some((option) => option.value)} placeholder="Search models" onChange={(value) => updateRow(mapping, row.id, { upstreamModelName: value })} />
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
                   <Button variant="ghost" icon="info" title="Last health response" onClick={() => setHealthInfoRow(row)} />
                   <span style={{ width: 8, height: 8, borderRadius: 999, background: row.health === 'healthy' ? '#10b981' : row.health === 'unhealthy' ? '#ef4444' : '#f59e0b', display: 'inline-block', flexShrink: 0 }} />

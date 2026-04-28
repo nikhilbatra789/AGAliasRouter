@@ -19,7 +19,8 @@ export async function GET() {
         unhealthyIntervalMinutes: config.unhealthyIntervalMinutes,
         healthyModelsIntervalMinutes: config.healthyModelsIntervalMinutes,
         unhealthyModelsIntervalMinutes: config.unhealthyModelsIntervalMinutes,
-        retentionIntervalMinutes: config.retentionIntervalMinutes
+        retentionIntervalMinutes: config.retentionIntervalMinutes,
+        healthCheckTimeoutSeconds: config.healthCheckTimeoutSeconds
       }
     });
   } catch (error) {
@@ -59,7 +60,8 @@ export async function PUT(request: Request) {
       'unhealthyIntervalMinutes',
       'healthyModelsIntervalMinutes',
       'unhealthyModelsIntervalMinutes',
-      'retentionIntervalMinutes'
+      'retentionIntervalMinutes',
+      'healthCheckTimeoutSeconds'
     ] as const;
 
     for (const key of timerFields) {
@@ -83,7 +85,8 @@ export async function PUT(request: Request) {
       unhealthyIntervalMinutes: body.unhealthyIntervalMinutes !== undefined ? Number(body.unhealthyIntervalMinutes) : current.unhealthyIntervalMinutes,
       healthyModelsIntervalMinutes: body.healthyModelsIntervalMinutes !== undefined ? Number(body.healthyModelsIntervalMinutes) : current.healthyModelsIntervalMinutes,
       unhealthyModelsIntervalMinutes: body.unhealthyModelsIntervalMinutes !== undefined ? Number(body.unhealthyModelsIntervalMinutes) : current.unhealthyModelsIntervalMinutes,
-      retentionIntervalMinutes: body.retentionIntervalMinutes !== undefined ? Number(body.retentionIntervalMinutes) : current.retentionIntervalMinutes
+      retentionIntervalMinutes: body.retentionIntervalMinutes !== undefined ? Number(body.retentionIntervalMinutes) : current.retentionIntervalMinutes,
+      healthCheckTimeoutSeconds: body.healthCheckTimeoutSeconds !== undefined ? Number(body.healthCheckTimeoutSeconds) : current.healthCheckTimeoutSeconds
     });
     await reloadRuntimeJobs();
 
@@ -98,7 +101,8 @@ export async function PUT(request: Request) {
         unhealthyIntervalMinutes: saved.unhealthyIntervalMinutes,
         healthyModelsIntervalMinutes: saved.healthyModelsIntervalMinutes,
         unhealthyModelsIntervalMinutes: saved.unhealthyModelsIntervalMinutes,
-        retentionIntervalMinutes: saved.retentionIntervalMinutes
+        retentionIntervalMinutes: saved.retentionIntervalMinutes,
+        healthCheckTimeoutSeconds: saved.healthCheckTimeoutSeconds
       }
     });
   } catch (error) {

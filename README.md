@@ -356,6 +356,7 @@ Runtime jobs are configured in the Configuration screen and saved to `config/app
 | Healthy model checks | 360 minutes | Re-check healthy model mapping rows |
 | Unhealthy model checks | 15 minutes | Re-check unhealthy or failed model mapping rows |
 | Log retention pruning | 60 minutes | Remove logs older than seven days |
+| Health check timeout | 60 seconds | Timeout for provider and model health-check calls |
 
 ## Translation Scope
 

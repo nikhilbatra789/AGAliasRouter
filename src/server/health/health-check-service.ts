@@ -1,5 +1,6 @@
 import { getProviderPools, saveProviderPools } from '@/server/config/provider-pools-config';
 import { getModelMappings, saveModelMappings } from '@/server/config/model-mappings-config';
+import { getAppConfig } from '@/server/config/app-config';
 import { createAnthropicMessage } from '@/server/providers/anthropic-compatible-client';
 import { createOpenAIChatCompletion } from '@/server/providers/openai-compatible-client';
 import { appendLog } from '@/server/logging/log-service';
@@ -62,7 +63,16 @@ function stringifyErrorPayload(data: unknown) {
   }
 }
 
-async function runProviderCheck(provider: ProviderPool['providers'][number], checkedAt: string) {
+function timeoutSignal(timeoutMs: number) {
+  return { signal: AbortSignal.timeout(timeoutMs) };
+}
+
+async function getHealthCheckTimeoutMs() {
+  const config = await getAppConfig();
+  return config.healthCheckTimeoutSeconds * 1000;
+}
+
+async function runProviderCheck(provider: ProviderPool['providers'][number], checkedAt: string, timeoutMs: number) {
   if (!provider.enabled) {
     return { ...provider, health: 'unknown' as const, lastCheck: checkedAt, lastError: '' };
   }
@@ -86,7 +96,7 @@ async function runProviderCheck(provider: ProviderPool['providers'][number], che
             max_tokens: 1,
             messages: [{ role: 'user', content: 'Hi' }]
           },
-          { signal: AbortSignal.timeout(15000) }
+          timeoutSignal(timeoutMs)
         )
       : await createOpenAIChatCompletion(
           provider,
@@ -96,7 +106,7 @@ async function runProviderCheck(provider: ProviderPool['providers'][number], che
             max_tokens: 1,
             temperature: 0
           },
-          { signal: AbortSignal.timeout(15000) }
+          timeoutSignal(timeoutMs)
         );
 
     const nextHealth = classifyStatus(result.response.status);
@@ -127,7 +137,8 @@ async function runProviderCheck(provider: ProviderPool['providers'][number], che
 async function runModelCheck(
   provider: ProviderPool['providers'][number],
   modelName: string,
-  checkedAt: string
+  checkedAt: string,
+  timeoutMs: number
 ): Promise<{ health: HealthState; status: number; responseBody: string; checkedAt: string }> {
   if (!provider.enabled) {
     return {
@@ -147,7 +158,7 @@ async function runModelCheck(
             max_tokens: 1,
             messages: [{ role: 'user', content: 'Hi' }]
           },
-          { signal: AbortSignal.timeout(15000) }
+          timeoutSignal(timeoutMs)
         )
       : await createOpenAIChatCompletion(
           provider,
@@ -157,7 +168,7 @@ async function runModelCheck(
             max_tokens: 1,
             temperature: 0
           },
-          { signal: AbortSignal.timeout(15000) }
+          timeoutSignal(timeoutMs)
         );
 
     const health = classifyModelStatus(result.response.status, result.data);
@@ -182,6 +193,7 @@ async function runModelCheck(
 
 export async function checkProviders(scope: HealthScope) {
   const checkedAt = new Date().toLocaleString();
+  const timeoutMs = await getHealthCheckTimeoutMs();
   const pools = await getProviderPools();
   const nextPools: ProviderPool[] = [];
 
@@ -194,7 +206,7 @@ export async function checkProviders(scope: HealthScope) {
         scope === provider.customName ||
         (scope === 'unhealthy' && provider.enabled && provider.health !== 'healthy' && provider.health !== 'unknown');
       if (matchesScope) {
-        nextProviders.push(await runProviderCheck(provider, checkedAt));
+        nextProviders.push(await runProviderCheck(provider, checkedAt, timeoutMs));
       } else {
         nextProviders.push(provider);
       }
@@ -227,6 +239,7 @@ export async function checkProvidersByHealth(target: Array<HealthState>) {
 
 export async function checkProviderModel(scope: string, modelName: string) {
   const checkedAt = new Date().toLocaleString();
+  const timeoutMs = await getHealthCheckTimeoutMs();
   const pools = await getProviderPools();
   const provider = pools
     .flatMap((pool) => pool.providers)
@@ -236,7 +249,7 @@ export async function checkProviderModel(scope: string, modelName: string) {
     throw new Error('Provider was not found.');
   }
 
-  const result = await runModelCheck(provider, modelName, checkedAt);
+  const result = await runModelCheck(provider, modelName, checkedAt, timeoutMs);
   return {
     scope,
     modelName,
@@ -250,6 +263,7 @@ export async function checkProviderModel(scope: string, modelName: string) {
 
 export async function checkModelMappingsByHealth(target: Array<HealthState>) {
   const checkedAt = new Date().toLocaleString();
+  const timeoutMs = await getHealthCheckTimeoutMs();
   const pools = await getProviderPools();
   const providersByUuid = new Map(
     pools.flatMap((pool) => pool.providers).map((provider) => [provider.uuid, provider] as const)
@@ -270,7 +284,7 @@ export async function checkModelMappingsByHealth(target: Array<HealthState>) {
         nextRows.push(row);
         continue;
       }
-      const result = await runModelCheck(provider, row.upstreamModelName, checkedAt);
+      const result = await runModelCheck(provider, row.upstreamModelName, checkedAt, timeoutMs);
       checked += 1;
       const nextHealth = row.health === 'healthy' && result.status === 408 ? row.health : result.health;
       nextRows.push({

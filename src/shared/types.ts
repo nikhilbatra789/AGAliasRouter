@@ -33,6 +33,7 @@ export type AppConfig = {
   healthyModelsIntervalMinutes: number;
   unhealthyModelsIntervalMinutes: number;
   retentionIntervalMinutes: number;
+  healthCheckTimeoutSeconds: number;
 };
 
 export type DashboardMetrics = {

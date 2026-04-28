@@ -525,6 +525,7 @@ Runtime timers are stored in `config/app_config.json` and can be edited from the
 | `healthyModelsIntervalMinutes` | `360` | Re-check healthy model mapping rows |
 | `unhealthyModelsIntervalMinutes` | `15` | Re-check unhealthy or failed model mapping rows |
 | `retentionIntervalMinutes` | `60` | Prune log files older than retention |
+| `healthCheckTimeoutSeconds` | `60` | Timeout for provider and model health-check calls |
 
 On startup, runtime jobs immediately refresh the model cache, prune old logs, and check degraded/unhealthy providers. Automatic model mapping checks are interval-driven so a service restart does not immediately flip saved model row health because of transient startup/network issues.
 
@@ -732,7 +733,8 @@ Success:
     "unhealthyIntervalMinutes": 60,
     "healthyModelsIntervalMinutes": 360,
     "unhealthyModelsIntervalMinutes": 15,
-    "retentionIntervalMinutes": 60
+    "retentionIntervalMinutes": 60,
+    "healthCheckTimeoutSeconds": 60
   }
 }
 ```
@@ -758,7 +760,8 @@ Body fields:
   "unhealthyIntervalMinutes": 60,
   "healthyModelsIntervalMinutes": 360,
   "unhealthyModelsIntervalMinutes": 15,
-  "retentionIntervalMinutes": 60
+  "retentionIntervalMinutes": 60,
+  "healthCheckTimeoutSeconds": 60
 }
 ```
 
@@ -1060,7 +1063,8 @@ Default `app_config.json`:
   "unhealthyIntervalMinutes": 60,
   "healthyModelsIntervalMinutes": 360,
   "unhealthyModelsIntervalMinutes": 15,
-  "retentionIntervalMinutes": 60
+  "retentionIntervalMinutes": 60,
+  "healthCheckTimeoutSeconds": 60
 }
 ```
 

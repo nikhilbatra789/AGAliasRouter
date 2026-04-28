@@ -13,6 +13,7 @@ export type StoredAppConfig = {
   healthyModelsIntervalMinutes: number;
   unhealthyModelsIntervalMinutes: number;
   retentionIntervalMinutes: number;
+  healthCheckTimeoutSeconds: number;
 };
 
 export const DEFAULT_APP_CONFIG: StoredAppConfig = {
@@ -26,7 +27,8 @@ export const DEFAULT_APP_CONFIG: StoredAppConfig = {
   unhealthyIntervalMinutes: 60,
   healthyModelsIntervalMinutes: 360,
   unhealthyModelsIntervalMinutes: 15,
-  retentionIntervalMinutes: 60
+  retentionIntervalMinutes: 60,
+  healthCheckTimeoutSeconds: 60
 };
 
 export function maskSecret(value: string) {
@@ -66,13 +68,14 @@ function normalizeAppConfig(raw: Partial<StoredAppConfig> | null): StoredAppConf
     throw new Error(`Invalid app config in ${CONFIG_FILES.app}: "providerCounter" must be a non-negative integer.`);
   }
 
-  const intervalFields: Array<keyof Pick<StoredAppConfig, 'cacheIntervalMinutes' | 'degradedIntervalMinutes' | 'unhealthyIntervalMinutes' | 'healthyModelsIntervalMinutes' | 'unhealthyModelsIntervalMinutes' | 'retentionIntervalMinutes'>> = [
+  const intervalFields: Array<keyof Pick<StoredAppConfig, 'cacheIntervalMinutes' | 'degradedIntervalMinutes' | 'unhealthyIntervalMinutes' | 'healthyModelsIntervalMinutes' | 'unhealthyModelsIntervalMinutes' | 'retentionIntervalMinutes' | 'healthCheckTimeoutSeconds'>> = [
     'cacheIntervalMinutes',
     'degradedIntervalMinutes',
     'unhealthyIntervalMinutes',
     'healthyModelsIntervalMinutes',
     'unhealthyModelsIntervalMinutes',
-    'retentionIntervalMinutes'
+    'retentionIntervalMinutes',
+    'healthCheckTimeoutSeconds'
   ];
 
   for (const field of intervalFields) {
@@ -93,7 +96,8 @@ function normalizeAppConfig(raw: Partial<StoredAppConfig> | null): StoredAppConf
     unhealthyIntervalMinutes: Number.isInteger(raw?.unhealthyIntervalMinutes) ? Number(raw?.unhealthyIntervalMinutes) : DEFAULT_APP_CONFIG.unhealthyIntervalMinutes,
     healthyModelsIntervalMinutes: Number.isInteger(raw?.healthyModelsIntervalMinutes) ? Number(raw?.healthyModelsIntervalMinutes) : DEFAULT_APP_CONFIG.healthyModelsIntervalMinutes,
     unhealthyModelsIntervalMinutes: Number.isInteger(raw?.unhealthyModelsIntervalMinutes) ? Number(raw?.unhealthyModelsIntervalMinutes) : DEFAULT_APP_CONFIG.unhealthyModelsIntervalMinutes,
-    retentionIntervalMinutes: Number.isInteger(raw?.retentionIntervalMinutes) ? Number(raw?.retentionIntervalMinutes) : DEFAULT_APP_CONFIG.retentionIntervalMinutes
+    retentionIntervalMinutes: Number.isInteger(raw?.retentionIntervalMinutes) ? Number(raw?.retentionIntervalMinutes) : DEFAULT_APP_CONFIG.retentionIntervalMinutes,
+    healthCheckTimeoutSeconds: Number.isInteger(raw?.healthCheckTimeoutSeconds) ? Number(raw?.healthCheckTimeoutSeconds) : DEFAULT_APP_CONFIG.healthCheckTimeoutSeconds
   };
 }
 
@@ -122,10 +126,11 @@ export async function saveAppConfig(next: StoredAppConfig): Promise<StoredAppCon
     next.unhealthyIntervalMinutes,
     next.healthyModelsIntervalMinutes,
     next.unhealthyModelsIntervalMinutes,
-    next.retentionIntervalMinutes
+    next.retentionIntervalMinutes,
+    next.healthCheckTimeoutSeconds
   ];
   if (intervals.some((value) => !Number.isInteger(value) || value <= 0)) {
-    throw new Error('All runtime timer intervals must be positive integers in minutes.');
+    throw new Error('All runtime timer intervals and health timeout values must be positive integers.');
   }
   await writeJsonFile(CONFIG_FILES.app, next);
   return next;

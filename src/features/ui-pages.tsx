@@ -43,8 +43,8 @@ function useMobile(bp = 768) {
 export function LoginPage() {
   const router = useRouter();
   const params = useSearchParams();
-  const [user, setUser] = useState('admin@gmail.com');
-  const [pw, setPw] = useState('123456');
+  const [user, setUser] = useState('');
+  const [pw, setPw] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
 
@@ -101,7 +101,8 @@ function ProviderBigCard({
   logoSrc,
   logoAlt,
   accent,
-  unhealthy
+  unhealthy,
+  unhealthyProviders = []
 }: {
   label: string;
   count: number;
@@ -111,8 +112,10 @@ function ProviderBigCard({
   logoAlt?: string;
   accent: string;
   unhealthy?: boolean;
+  unhealthyProviders?: DashboardMetrics['unhealthyProviders'];
 }) {
   const healthyCount = healthy ?? 0;
+  const healthColor = (health: HealthState) => health === 'degraded' ? '#f59e0b' : health === 'healthy' ? '#10b981' : '#ef4444';
   return (
     <div style={{ background: '#fff', border: '1px solid #c2c6d1', borderRadius: 8, padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12, position: 'relative', overflow: 'hidden' }}>
       <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: accent, borderRadius: '8px 0 0 8px' }} />
@@ -135,9 +138,22 @@ function ProviderBigCard({
         </div>
       )}
       {unhealthy && (
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <span style={{ width: 6, height: 6, borderRadius: 999, background: count > 0 ? '#ba1a1a' : '#10b981', display: 'inline-block' }} />
-          <span style={{ font: '600 11px/16px "Space Grotesk"', letterSpacing: '.05em', textTransform: 'uppercase', color: count > 0 ? '#93000a' : '#047857' }}>{count > 0 ? 'Action Required' : 'All Clear'}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <span style={{ width: 6, height: 6, borderRadius: 999, background: count > 0 ? '#ba1a1a' : '#10b981', display: 'inline-block' }} />
+            <span style={{ font: '600 11px/16px "Space Grotesk"', letterSpacing: '.05em', textTransform: 'uppercase', color: count > 0 ? '#93000a' : '#047857' }}>{count > 0 ? 'Action Required' : 'All Clear'}</span>
+          </div>
+          {unhealthyProviders.length > 0 && (
+            <div style={{ borderTop: '1px solid #f0f2f4', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 96, overflow: 'auto' }}>
+              {unhealthyProviders.map((provider) => (
+                <div key={provider.uuid} title={provider.lastError || provider.customName} style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: 999, background: healthColor(provider.health), flexShrink: 0 }} />
+                  <span style={{ font: '500 12px/16px Inter', color: '#424750', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{provider.customName}</span>
+                  <span style={{ font: '500 10px/14px "Space Grotesk"', color: healthColor(provider.health), textTransform: 'uppercase', marginLeft: 'auto', flexShrink: 0 }}>{provider.health}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -254,7 +270,7 @@ export function DashboardPage() {
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 16 }}>
           <ProviderBigCard label="OpenAI Providers" count={metrics?.providerCounts['openai-custom'] ?? 0} healthy={metrics?.healthyCounts['openai-custom'] ?? 0} logoSrc="/openai.svg" logoAlt="OpenAI logo" accent="#0f457c" />
           <ProviderBigCard label="Anthropic Providers" count={metrics?.providerCounts['anthropic-custom'] ?? 0} healthy={metrics?.healthyCounts['anthropic-custom'] ?? 0} logoSrc="/anthropic.svg" logoAlt="Anthropic logo" accent="#7c3aed" />
-          <ProviderBigCard label="Unhealthy Providers" count={metrics?.unhealthyCount ?? 0} icon="warning" accent="#ba1a1a" unhealthy />
+          <ProviderBigCard label="Unhealthy Providers" count={metrics?.unhealthyCount ?? 0} icon="warning" accent="#ba1a1a" unhealthy unhealthyProviders={metrics?.unhealthyProviders ?? []} />
         </div>
       </section>
       <section>
@@ -335,7 +351,7 @@ export function ConfigurationPage() {
     cacheIntervalMinutes: '15',
     degradedIntervalMinutes: '15',
     unhealthyIntervalMinutes: '60',
-    healthyModelsIntervalMinutes: '360',
+    healthyModelsIntervalMinutes: '240',
     unhealthyModelsIntervalMinutes: '15',
     retentionIntervalMinutes: '60',
     healthCheckTimeoutSeconds: '60'
@@ -472,7 +488,7 @@ export function ConfigurationPage() {
                     cacheIntervalMinutes: parseTimerValue(timerConfig.cacheIntervalMinutes) || 15,
                     degradedIntervalMinutes: parseTimerValue(timerConfig.degradedIntervalMinutes) || 15,
                     unhealthyIntervalMinutes: parseTimerValue(timerConfig.unhealthyIntervalMinutes) || 60,
-                    healthyModelsIntervalMinutes: parseTimerValue(timerConfig.healthyModelsIntervalMinutes) || 360,
+                    healthyModelsIntervalMinutes: parseTimerValue(timerConfig.healthyModelsIntervalMinutes) || 240,
                     unhealthyModelsIntervalMinutes: parseTimerValue(timerConfig.unhealthyModelsIntervalMinutes) || 15,
                     retentionIntervalMinutes: parseTimerValue(timerConfig.retentionIntervalMinutes) || 60
                   };
@@ -1199,6 +1215,8 @@ export function ModelMappingsPage() {
     const mapping = mappingsRef.current.find((item) => item.id === mappingId);
     const row = mapping?.rows.find((item) => item.id === rowId);
     if (!row?.providerUuid || !row.upstreamModelName) return;
+    const provider = providers.find((item) => item.uuid === row.providerUuid);
+    if (provider && !provider.enabled) return;
 
     const shouldPersist = persistOnSuccess ?? rowIsPersisted(mappingId, rowId);
     setCheckingRows((current) => ({ ...current, [rowId]: true }));
@@ -1338,8 +1356,10 @@ export function ModelMappingsPage() {
           <div style={{ display: 'grid', gridTemplateColumns: mappingRowGridTemplate, gap: 8, padding: '6px 16px', background: '#f7f9fb', borderTop: '1px solid #e6e8ea', borderBottom: '1px solid #e6e8ea' }}><div /><span style={{ font: '500 11px/16px "Space Grotesk"', letterSpacing: '.06em', textTransform: 'uppercase', color: '#9aa0ab' }}>Provider Instance</span><span style={{ font: '500 11px/16px "Space Grotesk"', letterSpacing: '.06em', textTransform: 'uppercase', color: '#9aa0ab' }}>Model Name</span><span style={{ font: '500 11px/16px "Space Grotesk"', letterSpacing: '.06em', textTransform: 'uppercase', color: '#9aa0ab', textAlign: 'right' }}>Actions</span></div>
           {mapping.rows.map((row, index) => {
             const selectedProvider = providers.find((provider) => provider.uuid === row.providerUuid);
+            const providerDisabled = Boolean(selectedProvider && !selectedProvider.enabled);
             const selectedModelOptions = modelOptions(selectedProvider, row.upstreamModelName);
             const selectedModelValue = selectedModelOptions.some((option) => option.value === row.upstreamModelName) ? row.upstreamModelName : '';
+            const healthDotColor = providerDisabled ? '#9aa0ab' : row.health === 'healthy' ? '#10b981' : row.health === 'unhealthy' || row.health === 'failed' ? '#ef4444' : '#f59e0b';
             return (
               <div
                 key={row.id}
@@ -1355,7 +1375,7 @@ export function ModelMappingsPage() {
                   }
                   setDragging(null);
                 }}
-                style={{ display: 'grid', gridTemplateColumns: mappingRowGridTemplate, alignItems: 'center', gap: 8, padding: '8px 16px', borderBottom: '1px solid #f0f2f4', background: dragging?.rowId === row.id ? '#f2f7ff' : '#fff', transition: 'background .2s ease' }}
+                style={{ display: 'grid', gridTemplateColumns: mappingRowGridTemplate, alignItems: 'center', gap: 8, padding: '8px 16px', borderBottom: '1px solid #f0f2f4', background: dragging?.rowId === row.id ? '#f2f7ff' : providerDisabled ? '#f7f9fb' : '#fff', transition: 'background .2s ease', opacity: providerDisabled ? 0.72 : 1 }}
               >
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                   <button disabled={index === 0} onClick={() => updateMapping(mapping.id, { rows: mapping.rows.map((item, i, arr) => i === index - 1 ? row : i === index ? arr[index - 1] : item) })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9aa0ab' }}><span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_drop_up</span></button>
@@ -1371,25 +1391,25 @@ export function ModelMappingsPage() {
                   </span>
                   <button disabled={index === mapping.rows.length - 1} onClick={() => updateMapping(mapping.id, { rows: mapping.rows.map((item, i, arr) => i === index ? arr[index + 1] : i === index + 1 ? row : item) })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9aa0ab' }}><span className="material-symbols-outlined" style={{ fontSize: 14 }}>arrow_drop_down</span></button>
                 </div>
-                <SearchableSelect value={row.providerUuid} options={providerOptions.length ? providerOptions : [{ value: '', label: 'No providers available' }]} disabled={!providerOptions.length} placeholder="Search providers" onChange={(uuid) => { const provider = providers.find((item) => item.uuid === uuid); if (provider) applyProviderToRow(mapping.id, row.id, provider); }} />
-                <SearchableSelect value={selectedModelValue} options={selectedModelOptions} disabled={!selectedProvider || !selectedModelOptions.some((option) => option.value)} placeholder="Search models" onChange={(value) => updateRow(mapping, row.id, { upstreamModelName: value })} />
+                <SearchableSelect value={row.providerUuid} options={providerOptions.length ? providerOptions : [{ value: '', label: 'No providers available' }]} disabled={!providerOptions.length || providerDisabled} placeholder="Search providers" onChange={(uuid) => { const provider = providers.find((item) => item.uuid === uuid); if (provider) applyProviderToRow(mapping.id, row.id, provider); }} />
+                <SearchableSelect value={selectedModelValue} options={selectedModelOptions} disabled={providerDisabled || !selectedProvider || !selectedModelOptions.some((option) => option.value)} placeholder="Search models" onChange={(value) => updateRow(mapping, row.id, { upstreamModelName: value })} />
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
                   <Button variant="ghost" icon="info" title="Last health response" onClick={() => setHealthInfoRow(row)} />
-                  <span style={{ width: 8, height: 8, borderRadius: 999, background: row.health === 'healthy' ? '#10b981' : row.health === 'unhealthy' ? '#ef4444' : '#f59e0b', display: 'inline-block', flexShrink: 0 }} />
+                  <span style={{ width: 8, height: 8, borderRadius: 999, background: healthDotColor, display: 'inline-block', flexShrink: 0 }} />
                   <button
                     type="button"
-                    title="Check health"
+                    title={providerDisabled ? 'Provider is disabled' : 'Check health'}
                     onClick={() => checkRowModel(mapping.id, row.id)}
-                    disabled={checkingRows[row.id]}
+                    disabled={checkingRows[row.id] || providerDisabled}
                     style={{
                       border: 'none',
                       background: 'transparent',
-                      color: '#424750',
+                      color: providerDisabled ? '#9aa0ab' : '#424750',
                       width: 34,
                       height: 34,
                       borderRadius: 4,
-                      cursor: checkingRows[row.id] ? 'not-allowed' : 'pointer',
-                      opacity: checkingRows[row.id] ? 0.6 : 1,
+                      cursor: checkingRows[row.id] || providerDisabled ? 'not-allowed' : 'pointer',
+                      opacity: checkingRows[row.id] || providerDisabled ? 0.6 : 1,
                       display: 'inline-flex',
                       alignItems: 'center',
                       justifyContent: 'center'

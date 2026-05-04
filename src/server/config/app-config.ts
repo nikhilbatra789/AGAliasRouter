@@ -25,7 +25,7 @@ export const DEFAULT_APP_CONFIG: StoredAppConfig = {
   cacheIntervalMinutes: 15,
   degradedIntervalMinutes: 15,
   unhealthyIntervalMinutes: 60,
-  healthyModelsIntervalMinutes: 360,
+  healthyModelsIntervalMinutes: 240,
   unhealthyModelsIntervalMinutes: 15,
   retentionIntervalMinutes: 60,
   healthCheckTimeoutSeconds: 60

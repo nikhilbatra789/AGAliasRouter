@@ -40,6 +40,13 @@ export type DashboardMetrics = {
   providerCounts: Record<ProviderFamily, number>;
   healthyCounts: Record<ProviderFamily, number>;
   unhealthyCount: number;
+  unhealthyProviders: Array<{
+    uuid: string;
+    customName: string;
+    family: ProviderFamily;
+    health: HealthState;
+    lastError?: string;
+  }>;
   serviceStartedAt: string;
   serverTime: string;
   nodeVersion: string;

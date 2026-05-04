@@ -23,6 +23,7 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
   };
 
   let unhealthyCount = 0;
+  const unhealthyProviders: DashboardMetrics['unhealthyProviders'] = [];
   for (const pool of pools) {
     providerCounts[pool.family] += pool.providers.length;
     for (const provider of pool.providers) {
@@ -31,6 +32,13 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
         healthyCounts[pool.family] += 1;
       } else if (provider.enabled) {
         unhealthyCount += 1;
+        unhealthyProviders.push({
+          uuid: provider.uuid,
+          customName: provider.customName,
+          family: provider.family,
+          health: provider.health,
+          lastError: provider.lastError
+        });
       }
     }
   }
@@ -39,10 +47,10 @@ export async function getDashboardMetrics(): Promise<DashboardMetrics> {
     providerCounts,
     healthyCounts,
     unhealthyCount,
+    unhealthyProviders,
     serviceStartedAt,
     serverTime: new Date().toISOString(),
     nodeVersion: process.version,
     platform: `${process.platform}-${process.arch}`
   };
 }
-

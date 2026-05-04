@@ -522,7 +522,7 @@ Runtime timers are stored in `config/app_config.json` and can be edited from the
 | `cacheIntervalMinutes` | `15` | Refresh `models_cache.json` from providers |
 | `degradedIntervalMinutes` | `15` | Re-check degraded providers |
 | `unhealthyIntervalMinutes` | `60` | Re-check unhealthy or failed providers |
-| `healthyModelsIntervalMinutes` | `360` | Re-check healthy model mapping rows |
+| `healthyModelsIntervalMinutes` | `240` | Re-check healthy model mapping rows |
 | `unhealthyModelsIntervalMinutes` | `15` | Re-check unhealthy or failed model mapping rows |
 | `retentionIntervalMinutes` | `60` | Prune log files older than retention |
 | `healthCheckTimeoutSeconds` | `60` | Timeout for provider and model health-check calls |
@@ -731,7 +731,7 @@ Success:
     "cacheIntervalMinutes": 15,
     "degradedIntervalMinutes": 15,
     "unhealthyIntervalMinutes": 60,
-    "healthyModelsIntervalMinutes": 360,
+    "healthyModelsIntervalMinutes": 240,
     "unhealthyModelsIntervalMinutes": 15,
     "retentionIntervalMinutes": 60,
     "healthCheckTimeoutSeconds": 60
@@ -758,7 +758,7 @@ Body fields:
   "cacheIntervalMinutes": 15,
   "degradedIntervalMinutes": 15,
   "unhealthyIntervalMinutes": 60,
-  "healthyModelsIntervalMinutes": 360,
+  "healthyModelsIntervalMinutes": 240,
   "unhealthyModelsIntervalMinutes": 15,
   "retentionIntervalMinutes": 60,
   "healthCheckTimeoutSeconds": 60
@@ -1061,7 +1061,7 @@ Default `app_config.json`:
   "cacheIntervalMinutes": 15,
   "degradedIntervalMinutes": 15,
   "unhealthyIntervalMinutes": 60,
-  "healthyModelsIntervalMinutes": 360,
+  "healthyModelsIntervalMinutes": 240,
   "unhealthyModelsIntervalMinutes": 15,
   "retentionIntervalMinutes": 60,
   "healthCheckTimeoutSeconds": 60

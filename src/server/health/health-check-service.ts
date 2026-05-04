@@ -8,7 +8,21 @@ import type { HealthState, ProviderPool } from '@/shared/types';
 
 type HealthScope = 'all' | string;
 
-function classifyStatus(status: number): HealthState {
+function hasErrorFinishReason(data: unknown) {
+  if (!data || typeof data !== 'object') return false;
+  const record = data as Record<string, unknown>;
+  if (record.error) return true;
+  if (typeof record.stop_reason === 'string' && record.stop_reason.toLowerCase() === 'error') return true;
+  const choices = Array.isArray(record.choices) ? record.choices : [];
+  return choices.some((choice) => {
+    if (!choice || typeof choice !== 'object') return false;
+    const finishReason = (choice as { finish_reason?: unknown }).finish_reason;
+    return typeof finishReason === 'string' && finishReason.toLowerCase() === 'error';
+  });
+}
+
+function classifyStatus(status: number, data: unknown): HealthState {
+  if (status >= 200 && status < 300 && hasErrorFinishReason(data)) return 'unhealthy';
   if (status >= 200 && status < 300) return 'healthy';
   if (status === 429 || status === 408) return 'degraded';
   return 'unhealthy';
@@ -16,6 +30,7 @@ function classifyStatus(status: number): HealthState {
 
 function classifyModelStatus(status: number, data: unknown): HealthState {
   if (status === 429 || status === 408) return 'degraded';
+  if (status >= 200 && status < 300 && hasErrorFinishReason(data)) return 'unhealthy';
   if (status >= 200 && status < 300) {
     const nonEmpty =
       typeof data === 'string'
@@ -56,6 +71,19 @@ function stringifyErrorPayload(data: unknown) {
   }
   const message = record.message;
   if (typeof message === 'string' && message.trim()) return message.trim();
+  const choices = Array.isArray(record.choices) ? record.choices : [];
+  for (const choice of choices) {
+    if (!choice || typeof choice !== 'object') continue;
+    const choiceRecord = choice as Record<string, unknown>;
+    const finishReason = choiceRecord.finish_reason;
+    const messageRecord = choiceRecord.message && typeof choiceRecord.message === 'object'
+      ? choiceRecord.message as Record<string, unknown>
+      : null;
+    const content = messageRecord?.content;
+    if (typeof finishReason === 'string' && finishReason.toLowerCase() === 'error' && typeof content === 'string' && content.trim()) {
+      return content.trim();
+    }
+  }
   try {
     return JSON.stringify(data).slice(0, 1200);
   } catch {
@@ -109,15 +137,15 @@ async function runProviderCheck(provider: ProviderPool['providers'][number], che
           timeoutSignal(timeoutMs)
         );
 
-    const nextHealth = classifyStatus(result.response.status);
-    const errorMessage = result.response.ok
+    const nextHealth = classifyStatus(result.response.status, result.data);
+    const errorMessage = nextHealth === 'healthy'
       ? ''
       : stringifyErrorPayload(result.data) || `HTTP ${result.response.status}`;
     await appendLog('INFO', `health.check provider=${provider.customName} status=${result.response.status} health=${nextHealth}`);
     return {
       ...provider,
       health: nextHealth,
-      errorCount: result.response.ok ? provider.errorCount : provider.errorCount + 1,
+      errorCount: nextHealth === 'healthy' ? provider.errorCount : provider.errorCount + 1,
       lastCheck: checkedAt,
       lastError: errorMessage
     };

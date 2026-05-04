@@ -7,7 +7,7 @@ export const mockAppConfig: AppConfig = {
   cacheIntervalMinutes: 15,
   degradedIntervalMinutes: 15,
   unhealthyIntervalMinutes: 60,
-  healthyModelsIntervalMinutes: 360,
+  healthyModelsIntervalMinutes: 240,
   unhealthyModelsIntervalMinutes: 15,
   retentionIntervalMinutes: 60,
   healthCheckTimeoutSeconds: 60
@@ -23,6 +23,7 @@ export const mockDashboardMetrics: DashboardMetrics = {
     'anthropic-custom': 2
   },
   unhealthyCount: 2,
+  unhealthyProviders: [],
   serviceStartedAt: '2026-04-20T08:14:33Z',
   serverTime: new Date().toISOString(),
   nodeVersion: 'v22.14.0',

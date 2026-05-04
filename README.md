@@ -353,7 +353,7 @@ Runtime jobs are configured in the Configuration screen and saved to `config/app
 | Model cache refresh | 15 minutes | Refresh `models_cache.json` from providers |
 | Degraded provider checks | 15 minutes | Re-check degraded providers |
 | Unhealthy provider checks | 60 minutes | Re-check unhealthy or failed providers |
-| Healthy model checks | 360 minutes | Re-check healthy model mapping rows |
+| Healthy model checks | 240 minutes | Re-check healthy model mapping rows |
 | Unhealthy model checks | 15 minutes | Re-check unhealthy or failed model mapping rows |
 | Log retention pruning | 60 minutes | Remove logs older than seven days |
 | Health check timeout | 60 seconds | Timeout for provider and model health-check calls |

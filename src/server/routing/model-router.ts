@@ -1,7 +1,11 @@
 import type { ModelMapping, ProviderFamily } from '@/shared/types';
 import { getModelMappings, persistMappingRuntimeState } from '@/server/config/model-mappings-config';
 import { getProviderPools } from '@/server/config/provider-pools-config';
+import { readModelsCache } from '@/server/models/models-cache-service';
 import { acquireProviderRateLimit, checkProviderRateLimit, releaseProviderRateLimit } from '@/server/rate-limits/rate-limit-service';
+import { findPlainProviderModel, parseProviderNumberModel } from './global-provider-model-routing';
+
+export { findPlainProviderModel, parseProviderNumberModel } from './global-provider-model-routing';
 
 type Provider = Awaited<ReturnType<typeof getProviderPools>>[number]['providers'][number];
 
@@ -11,6 +15,12 @@ export type RouteSelection = {
   upstreamModelName: string;
   rowId: string;
   rowHealth: string;
+  rateLimitAcquired: boolean;
+};
+
+export type GlobalProviderRouteSelection = {
+  provider: Provider;
+  upstreamModelName: string;
   rateLimitAcquired: boolean;
 };
 
@@ -36,6 +46,27 @@ function candidateHealth(rowHealth: string, providerHealth: string) {
   if (isHealthy(rowHealth) && isHealthy(providerHealth)) return 'healthy';
   if (isDegraded(rowHealth) || isDegraded(providerHealth)) return 'degraded';
   return 'unavailable';
+}
+
+function isStrictHealthy(provider: Provider) {
+  return provider.enabled && provider.health === 'healthy';
+}
+
+function acquireGlobalProviderRoute(
+  route: { provider: Provider; upstreamModelName: string } | null,
+  modelName: string
+): GlobalProviderRouteSelection | null {
+  if (!route) return null;
+  if (!isStrictHealthy(route.provider)) return null;
+  const rateLimit = acquireProviderRateLimit(route.provider);
+  if (!rateLimit.allowed) {
+    throw new RouteRateLimitError(rateLimit.reason || `Provider is currently rate-limited: ${route.provider.customName}`, rateLimit.retryAfterMs || 60_000);
+  }
+  return {
+    provider: route.provider,
+    upstreamModelName: route.upstreamModelName || modelName,
+    rateLimitAcquired: true
+  };
 }
 
 export async function resolveMappedModel(modelAlias: string, preferredFamily?: ProviderFamily): Promise<RouteSelection | null> {
@@ -89,6 +120,22 @@ export async function resolveMappedModel(modelAlias: string, preferredFamily?: P
     rowHealth: selected.row.health,
     rateLimitAcquired: true
   };
+}
+
+export async function resolveGlobalProviderModel(modelName: string): Promise<GlobalProviderRouteSelection | null> {
+  const providers = (await getProviderPools()).flatMap((pool) => pool.providers);
+  const providerNumberRoute = parseProviderNumberModel(modelName, providers);
+  if (providerNumberRoute) {
+    return acquireGlobalProviderRoute(providerNumberRoute, modelName);
+  }
+
+  const cache = await readModelsCache();
+  return acquireGlobalProviderRoute(findPlainProviderModel(modelName, providers, cache.models), modelName);
+}
+
+export function releaseGlobalProviderRouteRateLimit(selection: GlobalProviderRouteSelection) {
+  if (!selection.rateLimitAcquired) return;
+  releaseProviderRateLimit(selection.provider);
 }
 
 export function releaseRouteSelectionRateLimit(selection: RouteSelection) {

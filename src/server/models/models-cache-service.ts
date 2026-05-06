@@ -183,7 +183,8 @@ export async function getGlobalOpenAIModels() {
 
   const byModelId = new Map<string, CachedModel>();
   for (const model of cache.models) {
-    if (!byModelId.has(model.id)) byModelId.set(model.id, model);
+    const id = model.owned_by ? `${model.owned_by}/${model.id}` : model.id;
+    if (!byModelId.has(id)) byModelId.set(id, { ...model, id });
   }
   const mappings = await getModelMappings();
   for (const mapping of mappings) {

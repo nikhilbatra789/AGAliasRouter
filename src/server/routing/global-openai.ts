@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { validateClientApiKey } from '@/server/auth/client-api-auth';
 import { openAIError } from '@/server/errors/api-errors';
 import { getGlobalOpenAIModels } from '@/server/models/models-cache-service';
-import { markRouteSelectionResult, resolveMappedModel, RouteRateLimitError } from '@/server/routing/model-router';
+import { markRouteSelectionResult, resolveGlobalProviderModel, resolveMappedModel, RouteRateLimitError } from '@/server/routing/model-router';
 import { createOpenAIChatCompletion } from '@/server/providers/openai-compatible-client';
 import { createAnthropicMessage } from '@/server/providers/anthropic-compatible-client';
 import { logRouteEvent } from '@/server/logging/route-logging';
@@ -63,7 +63,57 @@ export async function handleGlobalOpenAIChatCompletions(request: Request) {
     if (!body.model) return openAIError('Request body must include a model.', 400);
 
     const selection = await resolveMappedModel(body.model);
-    if (!selection) return openAIError(`Model alias was not found or has no available provider: ${body.model}`, 404, 'model_not_found');
+    if (!selection) {
+      const providerSelection = await resolveGlobalProviderModel(body.model);
+      if (!providerSelection) {
+        return openAIError(`Model alias was not found or has no available provider: ${body.model}`, 404, 'model_not_found');
+      }
+      if (providerSelection.provider.family === 'anthropic-custom') {
+        const anthropicBody = translateOpenAIChatRequestToAnthropic({ ...body, model: providerSelection.upstreamModelName });
+        const { response, data } = await createAnthropicMessage(providerSelection.provider, anthropicBody);
+        if (!response.ok) {
+          await logRouteEvent({
+            route: '/v1/chat/completions',
+            status: response.status,
+            latencyMs: Date.now() - startedAt,
+            provider: providerSelection.provider.customName,
+            model: providerSelection.upstreamModelName,
+            requestHeaders: Object.fromEntries(request.headers.entries()),
+            requestBody: body,
+            responseBody: data,
+            requestBodyLoggingEnabled: request.headers.get('x-aglias-log-body') === '1'
+          });
+          return NextResponse.json(data, { status: response.status });
+        }
+        const translatedData = translateAnthropicResponseToOpenAIChatCompletion(data, providerSelection.upstreamModelName);
+        await logRouteEvent({
+          route: '/v1/chat/completions',
+          status: response.status,
+          latencyMs: Date.now() - startedAt,
+          provider: providerSelection.provider.customName,
+          model: providerSelection.upstreamModelName,
+          requestHeaders: Object.fromEntries(request.headers.entries()),
+          requestBody: body,
+          responseBody: translatedData,
+          requestBodyLoggingEnabled: request.headers.get('x-aglias-log-body') === '1'
+        });
+        return NextResponse.json(translatedData, { status: response.status });
+      }
+
+      const { response, data } = await createOpenAIChatCompletion(providerSelection.provider, { ...body, model: providerSelection.upstreamModelName });
+      await logRouteEvent({
+        route: '/v1/chat/completions',
+        status: response.status,
+        latencyMs: Date.now() - startedAt,
+        provider: providerSelection.provider.customName,
+        model: providerSelection.upstreamModelName,
+        requestHeaders: Object.fromEntries(request.headers.entries()),
+        requestBody: body,
+        responseBody: data,
+        requestBodyLoggingEnabled: request.headers.get('x-aglias-log-body') === '1'
+      });
+      return NextResponse.json(data, { status: response.status });
+    }
 
     if (selection.provider.family === 'anthropic-custom') {
       const anthropicBody = translateOpenAIChatRequestToAnthropic({ ...body, model: selection.upstreamModelName });

@@ -39,6 +39,8 @@ export type AppConfig = {
 export type DashboardMetrics = {
   providerCounts: Record<ProviderFamily, number>;
   healthyCounts: Record<ProviderFamily, number>;
+  degradedCounts: Record<ProviderFamily, number>;
+  disabledCounts: Record<ProviderFamily, number>;
   unhealthyCount: number;
   unhealthyProviders: Array<{
     uuid: string;

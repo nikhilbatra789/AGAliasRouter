@@ -5,6 +5,7 @@ import type {
   DashboardMetrics,
   LogEvent,
   ModelMapping,
+  Provider,
   ProviderModel,
   ProviderPool,
   SessionUser
@@ -53,6 +54,12 @@ export const adminApi = {
   },
   providerModels(providerUuid: string) {
     return request<{ providerUuid: string; models: ProviderModel[] }>(`/api/admin/provider-models?providerUuid=${encodeURIComponent(providerUuid)}`);
+  },
+  fetchProviderModels(provider: Provider) {
+    return request<{ providerUuid: string; models: ProviderModel[] }>('/api/admin/provider-models', {
+      method: 'POST',
+      body: JSON.stringify({ provider })
+    });
   },
   saveProviderPools(payload: ProviderPool[]) {
     return request<ProviderPool[]>('/api/admin/provider-pools', {

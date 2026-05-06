@@ -22,6 +22,14 @@ export const mockDashboardMetrics: DashboardMetrics = {
     'openai-custom': 2,
     'anthropic-custom': 2
   },
+  degradedCounts: {
+    'openai-custom': 1,
+    'anthropic-custom': 1
+  },
+  disabledCounts: {
+    'openai-custom': 0,
+    'anthropic-custom': 0
+  },
   unhealthyCount: 2,
   unhealthyProviders: [],
   serviceStartedAt: '2026-04-20T08:14:33Z',

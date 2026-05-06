@@ -4,7 +4,7 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "dev": "next dev -H 127.0.0.1 -p 9001",
+    "dev": "node scripts/dev-open.mjs",
     "build": "next build",
     "start": "next start -p 9001",
     "lint": "next lint",

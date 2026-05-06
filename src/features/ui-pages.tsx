@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { adminApi } from './api-client';
@@ -47,9 +48,12 @@ export function LoginPage() {
   const [pw, setPw] = useState('');
   const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState('');
+  const [loginAttempted, setLoginAttempted] = useState(false);
 
   async function login() {
+    setLoginAttempted(true);
     setError('');
+    if (!user.trim() || !pw.trim()) return;
     const response = await adminApi.login(user, pw, params.get('next') || undefined);
     if (!response.ok) {
       setError(response.error.message);
@@ -76,10 +80,10 @@ export function LoginPage() {
           }}
           style={{ background: '#fff', border: '1px solid #c2c6d1', borderRadius: 12, padding: 32, boxShadow: '0 4px 12px rgba(15,23,42,.03)', display: 'flex', flexDirection: 'column', gap: 16 }}
         >
-          <Field label="Username" icon="person" autoFocus value={user} onChange={setUser} placeholder="admin@gmail.com" error={!user.trim() ? 'Username is required.' : undefined} />
-          <Field label="Password" icon="lock" type={showPw ? 'text' : 'password'} trailingIcon={showPw ? 'visibility_off' : 'visibility'} onTrailing={() => setShowPw((value) => !value)} value={pw} onChange={setPw} placeholder="Password" error={!pw.trim() ? 'Password is required.' : undefined} />
+          <Field label="Username" icon="person" autoFocus value={user} onChange={setUser} placeholder="admin@gmail.com" error={loginAttempted && !user.trim() ? 'Username is required.' : undefined} />
+          <Field label="Password" icon="lock" type={showPw ? 'text' : 'password'} trailingIcon={showPw ? 'visibility_off' : 'visibility'} onTrailing={() => setShowPw((value) => !value)} value={pw} onChange={setPw} placeholder="Password" error={loginAttempted && !pw.trim() ? 'Password is required.' : undefined} />
           {error && <div style={{ font: '500 13px/18px Inter', color: '#991b1b', background: '#fff5f5', border: '1px solid #fca5a5', borderRadius: 6, padding: '9px 12px' }}>{error}</div>}
-          <Button variant="primary" full type="submit" disabled={!user.trim() || !pw.trim()}>Login</Button>
+          <Button variant="primary" full type="submit">Login</Button>
         </form>
         <footer style={{ marginTop: 16, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 4, opacity: .85 }}>
           <p style={{ font: '400 13px/18px Inter', color: '#737781', margin: 0 }}>Copyright © 2026 AG AliasRouter</p>
@@ -97,6 +101,8 @@ function ProviderBigCard({
   label,
   count,
   healthy,
+  degraded,
+  disabled,
   icon,
   logoSrc,
   logoAlt,
@@ -107,6 +113,8 @@ function ProviderBigCard({
   label: string;
   count: number;
   healthy?: number;
+  degraded?: number;
+  disabled?: number;
   icon?: string;
   logoSrc?: string;
   logoAlt?: string;
@@ -115,6 +123,15 @@ function ProviderBigCard({
   unhealthyProviders?: DashboardMetrics['unhealthyProviders'];
 }) {
   const healthyCount = healthy ?? 0;
+  const degradedCount = degraded ?? 0;
+  const disabledCount = disabled ?? 0;
+  const unhealthyOrFailedCount = Math.max(0, count - healthyCount - degradedCount - disabledCount);
+  const summaryParts = [
+    healthyCount > 0 ? `${healthyCount} healthy` : '',
+    degradedCount > 0 ? `${degradedCount} degraded` : '',
+    unhealthyOrFailedCount > 0 ? `${unhealthyOrFailedCount} unhealthy` : '',
+    disabledCount > 0 ? `${disabledCount} disabled` : ''
+  ].filter(Boolean);
   const healthColor = (health: HealthState) => health === 'degraded' ? '#f59e0b' : health === 'healthy' ? '#10b981' : '#ef4444';
   return (
     <div style={{ background: '#fff', border: '1px solid #c2c6d1', borderRadius: 8, padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 12, position: 'relative', overflow: 'hidden' }}>
@@ -123,7 +140,7 @@ function ProviderBigCard({
         <div>
           <div style={{ font: '500 11px/16px "Space Grotesk"', letterSpacing: '.06em', textTransform: 'uppercase', color: '#737781', marginBottom: 6 }}>{label}</div>
           <div style={{ font: '600 48px/1 Inter', letterSpacing: '-0.03em', color: '#191c1e' }}>{count}</div>
-          <div style={{ font: '400 12px/16px Inter', color: '#424750', marginTop: 4 }}>{unhealthy ? 'providers degraded or offline' : `${healthyCount} healthy · ${count - healthyCount} degraded`}</div>
+          <div style={{ font: '400 12px/16px Inter', color: '#424750', marginTop: 4 }}>{unhealthy ? 'providers degraded or offline' : summaryParts.join(' · ') || 'No providers'}</div>
         </div>
         {logoSrc ? (
           <Image src={logoSrc} alt={logoAlt || label} width={38} height={38} style={{ objectFit: 'contain', opacity: .95 }} />
@@ -134,7 +151,9 @@ function ProviderBigCard({
       {!unhealthy && (
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <div style={{ flex: Math.max(healthyCount, 1), height: 4, background: '#10b981', borderRadius: 2 }} />
-          {count - healthyCount > 0 && <div style={{ flex: count - healthyCount, height: 4, background: '#f59e0b', borderRadius: 2 }} />}
+          {degradedCount > 0 && <div style={{ flex: degradedCount, height: 4, background: '#f59e0b', borderRadius: 2 }} />}
+          {unhealthyOrFailedCount > 0 && <div style={{ flex: unhealthyOrFailedCount, height: 4, background: '#ef4444', borderRadius: 2 }} />}
+          {disabledCount > 0 && <div style={{ flex: disabledCount, height: 4, background: '#9aa0ab', borderRadius: 2 }} />}
         </div>
       )}
       {unhealthy && (
@@ -268,8 +287,26 @@ export function DashboardPage() {
           <span style={{ font: '500 11px/16px "Space Grotesk"', letterSpacing: '.05em', textTransform: 'uppercase', color: '#737781' }}>Live · auto-refresh</span>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: 16 }}>
-          <ProviderBigCard label="OpenAI Providers" count={metrics?.providerCounts['openai-custom'] ?? 0} healthy={metrics?.healthyCounts['openai-custom'] ?? 0} logoSrc="/openai.svg" logoAlt="OpenAI logo" accent="#0f457c" />
-          <ProviderBigCard label="Anthropic Providers" count={metrics?.providerCounts['anthropic-custom'] ?? 0} healthy={metrics?.healthyCounts['anthropic-custom'] ?? 0} logoSrc="/anthropic.svg" logoAlt="Anthropic logo" accent="#7c3aed" />
+          <ProviderBigCard
+            label="OpenAI Providers"
+            count={metrics?.providerCounts['openai-custom'] ?? 0}
+            healthy={metrics?.healthyCounts['openai-custom'] ?? 0}
+            degraded={metrics?.degradedCounts['openai-custom'] ?? 0}
+            disabled={metrics?.disabledCounts['openai-custom'] ?? 0}
+            logoSrc="/openai.svg"
+            logoAlt="OpenAI logo"
+            accent="#0f457c"
+          />
+          <ProviderBigCard
+            label="Anthropic Providers"
+            count={metrics?.providerCounts['anthropic-custom'] ?? 0}
+            healthy={metrics?.healthyCounts['anthropic-custom'] ?? 0}
+            degraded={metrics?.degradedCounts['anthropic-custom'] ?? 0}
+            disabled={metrics?.disabledCounts['anthropic-custom'] ?? 0}
+            logoSrc="/anthropic.svg"
+            logoAlt="Anthropic logo"
+            accent="#7c3aed"
+          />
           <ProviderBigCard label="Unhealthy Providers" count={metrics?.unhealthyCount ?? 0} icon="warning" accent="#ba1a1a" unhealthy unhealthyProviders={metrics?.unhealthyProviders ?? []} />
         </div>
       </section>
@@ -538,6 +575,91 @@ function providerHealthLabel(provider: Provider) {
   return provider.enabled ? healthLabel(provider.health) : 'Disabled';
 }
 
+function HealthModelComboField({
+  value,
+  onChange,
+  options,
+  inputStyle
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: ProviderModel[];
+  inputStyle: CSSProperties;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const uniqueOptions = useMemo(() => {
+    const models = options.map((model) => model.name.trim()).filter(Boolean);
+    return Array.from(new Set(models));
+  }, [options]);
+  const filteredOptions = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) return uniqueOptions;
+    return uniqueOptions.filter((model) => model.toLowerCase().includes(normalized));
+  }, [query, uniqueOptions]);
+
+  useEffect(() => {
+    if (!open) return;
+    function closeOnOutsideClick(event: MouseEvent) {
+      if (!wrapperRef.current?.contains(event.target as Node)) setOpen(false);
+    }
+    window.addEventListener('mousedown', closeOnOutsideClick);
+    return () => window.removeEventListener('mousedown', closeOnOutsideClick);
+  }, [open]);
+
+  return (
+    <div ref={wrapperRef} style={{ position: 'relative' }}>
+      <input
+        style={{ ...inputStyle, paddingRight: 34 }}
+        placeholder="Model used for health checks"
+        value={value}
+        onFocus={() => setOpen(true)}
+        onChange={(event) => {
+          onChange(event.target.value);
+          setOpen(true);
+        }}
+      />
+      <button
+        type="button"
+        aria-label="Show fetched models"
+        onClick={() => setOpen((current) => !current)}
+        style={{ position: 'absolute', right: 6, top: 5, width: 28, height: 28, border: 'none', background: 'transparent', color: '#737781', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+      >
+        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>expand_more</span>
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', left: 0, right: 0, top: 'calc(100% + 4px)', zIndex: 1200, background: '#fff', border: '1px solid #c2c6d1', borderRadius: 6, boxShadow: '0 12px 28px rgba(15, 23, 42, .14)', padding: 8 }}>
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search fetched models"
+            style={{ width: '100%', border: '1px solid #0f62fe', outline: '2px solid rgba(15, 98, 254, .18)', borderRadius: 5, padding: '8px 10px', font: '400 13px/18px Inter', color: '#191c1e', marginBottom: 6 }}
+          />
+          <div style={{ maxHeight: 220, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+            {filteredOptions.length ? filteredOptions.map((model) => (
+              <button
+                type="button"
+                key={model}
+                onClick={() => {
+                  onChange(model);
+                  setOpen(false);
+                  setQuery('');
+                }}
+                style={{ border: 'none', background: model === value ? '#eef3fb' : 'transparent', color: '#191c1e', cursor: 'pointer', textAlign: 'left', padding: '8px 10px', borderRadius: 4, font: '400 13px/18px Inter' }}
+              >
+                {model}
+              </button>
+            )) : (
+              <div style={{ padding: '8px 10px', font: '400 13px/18px Inter', color: '#737781' }}>{uniqueOptions.length ? 'No matches' : 'Fetch models to show suggestions'}</div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProviderModal({ pool, initial, onClose, onSave }: { pool: ProviderPool; initial?: Provider; onClose: () => void; onSave: (provider: Provider) => void }) {
   const empty: Provider = {
     uuid: genId('provider'),
@@ -559,6 +681,8 @@ function ProviderModal({ pool, initial, onClose, onSave }: { pool: ProviderPool;
   };
   const [form, setForm] = useState<Provider>(initial || empty);
   const [modelText, setModelText] = useState((initial?.manualModels || []).join('\n'));
+  const [fetchedModels, setFetchedModels] = useState<ProviderModel[]>(initial?.models || []);
+  const [fetchingModels, setFetchingModels] = useState(false);
   const [providerApiKeyVisible, setProviderApiKeyVisible] = useState(false);
   const [error, setError] = useState('');
   const inputStyle = { width: '100%', padding: '9px 12px', borderRadius: 6, border: '1px solid #c2c6d1', background: '#fff', font: '400 13px/20px Inter', color: '#191c1e', outline: 'none' };
@@ -567,9 +691,37 @@ function ProviderModal({ pool, initial, onClose, onSave }: { pool: ProviderPool;
   useEffect(() => {
     setForm(initial || empty);
     setModelText((initial?.manualModels || []).join('\n'));
+    setFetchedModels(initial?.models || []);
+    setFetchingModels(false);
     setProviderApiKeyVisible(false);
     setError('');
   }, [initial, pool.family]);
+
+  async function fetchAvailableModels() {
+    if (!form.baseUrl.trim()) {
+      setError('Base URL is required before fetching models.');
+      return;
+    }
+    if (!form.apiKey?.trim()) {
+      setError('API Key is required before fetching models.');
+      return;
+    }
+    setFetchingModels(true);
+    setError('');
+    const manualModels = modelText.split('\n').map((value) => value.trim()).filter(Boolean);
+    const response = await adminApi.fetchProviderModels({
+      ...form,
+      family: pool.family,
+      manualModels
+    });
+    setFetchingModels(false);
+    if (!response.ok) {
+      setError(response.error.message || 'Unable to fetch provider models.');
+      return;
+    }
+    setFetchedModels(response.data.models);
+    setForm((current) => ({ ...current, models: response.data.models }));
+  }
 
   function save() {
     if (!form.customName.trim()) {
@@ -605,7 +757,7 @@ function ProviderModal({ pool, initial, onClose, onSave }: { pool: ProviderPool;
         <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20, maxHeight: '70vh', overflowY: 'auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
             <div><div style={labelStyle}>Custom Name</div><input style={inputStyle} placeholder="Custom Name" value={form.customName} onChange={(event) => setForm({ ...form, customName: event.target.value })} /></div>
-            <div><div style={labelStyle}>Health Check Model</div><input style={inputStyle} placeholder="Model used for health checks" value={form.checkModelName} onChange={(event) => setForm({ ...form, checkModelName: event.target.value })} /></div>
+            <div><div style={labelStyle}>Health Check Model</div><HealthModelComboField inputStyle={inputStyle} value={form.checkModelName} options={fetchedModels} onChange={(checkModelName) => setForm({ ...form, checkModelName })} /></div>
             <div>
               <div style={labelStyle}>Health Check</div>
               <div style={{ position: 'relative' }}>
@@ -625,7 +777,16 @@ function ProviderModal({ pool, initial, onClose, onSave }: { pool: ProviderPool;
                 <button type="button" onClick={() => setProviderApiKeyVisible((value) => !value)} aria-label={providerApiKeyVisible ? 'Hide provider API key' : 'Reveal provider API key'} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#737781', padding: '0 10px', display: 'inline-flex', alignItems: 'center', height: 38 }}><span className="material-symbols-outlined" style={{ fontSize: 18 }}>{providerApiKeyVisible ? 'visibility_off' : 'visibility'}</span></button>
               </div>
             </div>
-            <div><div style={labelStyle}>{pool.family === 'anthropic-custom' ? 'Anthropic Base URL' : 'OpenAI Base URL'}</div><input style={inputStyle} value={form.baseUrl} placeholder={pool.family === 'anthropic-custom' ? 'https://api.anthropic.com/v1' : 'https://api.openai.com/v1'} onChange={(event) => setForm({ ...form, baseUrl: event.target.value })} /></div>
+            <div>
+              <div style={{ ...labelStyle, justifyContent: 'space-between' }}>
+                <span>{pool.family === 'anthropic-custom' ? 'Anthropic Base URL' : 'OpenAI Base URL'}</span>
+                <button type="button" onClick={() => void fetchAvailableModels()} disabled={fetchingModels} style={{ border: 'none', background: 'transparent', color: '#244e86', cursor: fetchingModels ? 'wait' : 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4, font: '600 12px/16px Inter', padding: 0 }}>
+                  <span className="material-symbols-outlined" style={{ fontSize: 15, animation: fetchingModels ? 'spin .9s linear infinite' : undefined }}>sync</span>
+                  Fetch
+                </button>
+              </div>
+              <input style={inputStyle} value={form.baseUrl} placeholder={pool.family === 'anthropic-custom' ? 'https://api.anthropic.com/v1' : 'https://api.openai.com/v1'} onChange={(event) => setForm({ ...form, baseUrl: event.target.value })} />
+            </div>
           </div>
           <div>
             <div style={labelStyle}>Manual Provider Models</div>
@@ -1510,6 +1671,18 @@ export function CredentialFilesPage() {
     URL.revokeObjectURL(url);
   }
 
+  async function downloadAll() {
+    const response = await fetch('/api/admin/credential-files?download=zip');
+    if (!response.ok) return;
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'config.zip';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const cols = [
     { key: 'name', label: 'File', render: (file: CredentialFile) => <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 2 }}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><span className="material-symbols-outlined" style={{ fontSize: 18, color: '#0f457c', flexShrink: 0 }}>description</span><span style={{ fontFamily: 'Space Grotesk', fontWeight: 600, fontSize: 13, color: '#191c1e' }}>{file.name}</span></span><span style={{ fontFamily: 'Space Grotesk', fontSize: 11, color: '#737781', paddingLeft: 26, letterSpacing: '.02em' }}>{file.path}</span></span> },
     { key: 'added', label: 'Added', mono: true },
@@ -1519,7 +1692,7 @@ export function CredentialFilesPage() {
 
   return (
     <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-      <PageTitle actions={<Button variant="secondary" icon="folder_zip" onClick={() => download('config.zip.txt', files.map((file) => `--- ${file.path} ---\n${file.content}`).join('\n\n'))}>Download All</Button>}>Credential Files</PageTitle>
+      <PageTitle actions={<Button variant="secondary" icon="folder_zip" onClick={() => void downloadAll()}>Download All</Button>}>Credential Files</PageTitle>
       <div className="desktop-only-table"><DataTable columns={cols} rows={files} /></div>
       <div className="mobile-only-cards" style={{ display: 'none', flexDirection: 'column', gap: 10 }}>
         {files.map((file) => <div key={file.name} style={{ background: '#fff', border: '1px solid #c2c6d1', borderRadius: 8, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}><strong style={{ fontFamily: 'Space Grotesk' }}>{file.name}</strong><span style={{ font: '400 12px/16px "Space Grotesk"', color: '#737781' }}>{file.path}</span><div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}><Button variant="ghost" icon="visibility" onClick={() => setViewFile(file)}>View</Button><Button variant="ghost" icon="download" onClick={() => download(file.name, file.content)}>Download</Button><Button variant="danger" icon="delete" onClick={() => setDeleteConfirm(file)}>Delete</Button></div></div>)}

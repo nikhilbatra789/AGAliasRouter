@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start -p 9001",
     "lint": "next lint",
+    "test:unit": "node --test --experimental-strip-types tests/unit/*.test.ts",
     "test:e2e": "playwright test"
   },
   "dependencies": {

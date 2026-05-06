@@ -676,14 +676,17 @@ function ProviderModal({ pool, initial, onClose, onSave }: { pool: ProviderPool;
     baseUrl: '',
     apiKey: '',
     apiKeyMasked: '',
+    rateLimits: {},
     manualModels: [],
     models: []
   };
   const [form, setForm] = useState<Provider>(initial || empty);
   const [modelText, setModelText] = useState((initial?.manualModels || []).join('\n'));
+  const [requestsPerMinute, setRequestsPerMinute] = useState(initial?.rateLimits?.requestsPerMinute ? String(initial.rateLimits.requestsPerMinute) : '');
   const [fetchedModels, setFetchedModels] = useState<ProviderModel[]>(initial?.models || []);
   const [fetchingModels, setFetchingModels] = useState(false);
   const [providerApiKeyVisible, setProviderApiKeyVisible] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(Boolean(initial?.rateLimits?.requestsPerMinute || initial?.manualModels?.length));
   const [error, setError] = useState('');
   const inputStyle = { width: '100%', padding: '9px 12px', borderRadius: 6, border: '1px solid #c2c6d1', background: '#fff', font: '400 13px/20px Inter', color: '#191c1e', outline: 'none' };
   const labelStyle = { font: '500 12px/16px Inter', color: '#424750', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 };
@@ -691,9 +694,11 @@ function ProviderModal({ pool, initial, onClose, onSave }: { pool: ProviderPool;
   useEffect(() => {
     setForm(initial || empty);
     setModelText((initial?.manualModels || []).join('\n'));
+    setRequestsPerMinute(initial?.rateLimits?.requestsPerMinute ? String(initial.rateLimits.requestsPerMinute) : '');
     setFetchedModels(initial?.models || []);
     setFetchingModels(false);
     setProviderApiKeyVisible(false);
+    setAdvancedOpen(Boolean(initial?.rateLimits?.requestsPerMinute || initial?.manualModels?.length));
     setError('');
   }, [initial, pool.family]);
 
@@ -740,11 +745,19 @@ function ProviderModal({ pool, initial, onClose, onSave }: { pool: ProviderPool;
       setError('API Key is required.');
       return;
     }
+    const rpm = requestsPerMinute.trim() ? Number(requestsPerMinute.trim()) : undefined;
+    if (rpm !== undefined && (!Number.isInteger(rpm) || rpm <= 0)) {
+      setError('Requests per minute must be a positive whole number.');
+      return;
+    }
     const manualModels = modelText.split('\n').map((value) => value.trim()).filter(Boolean);
     onSave({
       ...form,
       name: form.name || form.customName,
       customName: form.customName.trim(),
+      rateLimits: {
+        requestsPerMinute: rpm
+      },
       manualModels,
       models: [...form.models.filter((model) => model.source !== 'manual'), ...manualModels.map((name) => ({ name, source: 'manual' as const }))]
     });
@@ -788,9 +801,42 @@ function ProviderModal({ pool, initial, onClose, onSave }: { pool: ProviderPool;
               <input style={inputStyle} value={form.baseUrl} placeholder={pool.family === 'anthropic-custom' ? 'https://api.anthropic.com/v1' : 'https://api.openai.com/v1'} onChange={(event) => setForm({ ...form, baseUrl: event.target.value })} />
             </div>
           </div>
-          <div>
-            <div style={labelStyle}>Manual Provider Models</div>
-            <textarea style={{ ...inputStyle, minHeight: 110, resize: 'vertical', fontFamily: 'Space Grotesk' }} value={modelText} onChange={(event) => setModelText(event.target.value)} placeholder={'One model per line\nexample-model-name'} />
+          <div style={{ borderTop: '1px solid #e6e8ea', paddingTop: 16 }}>
+            <button
+              type="button"
+              onClick={() => setAdvancedOpen((value) => !value)}
+              style={{ width: '100%', border: 0, background: 'transparent', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, color: '#737781' }}
+              aria-expanded={advancedOpen}
+            >
+              <span style={{ font: '600 12px/16px "Space Grotesk"', letterSpacing: '.06em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Advanced Configuration</span>
+              <span style={{ height: 1, background: '#c2c6d1', flex: 1 }} />
+              <span className="material-symbols-outlined" style={{ fontSize: 18, color: '#424750', transform: advancedOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform .15s ease' }}>expand_more</span>
+            </button>
+            {advancedOpen && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 14 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) minmax(120px, 180px)', gap: 16, alignItems: 'end' }}>
+                  <div>
+                    <div style={labelStyle}>Rate Limiting</div>
+                    <input style={{ ...inputStyle, background: '#f7f9fb' }} value="Requests per minute" readOnly />
+                  </div>
+                  <div>
+                    <div style={labelStyle}>Limit</div>
+                    <input
+                      style={inputStyle}
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      placeholder="No limit"
+                      value={requestsPerMinute}
+                      onChange={(event) => setRequestsPerMinute(event.target.value.replace(/\D/g, ''))}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div style={labelStyle}>Manual Provider Models</div>
+                  <textarea style={{ ...inputStyle, minHeight: 110, resize: 'vertical', fontFamily: 'Space Grotesk' }} value={modelText} onChange={(event) => setModelText(event.target.value)} placeholder={'One model per line\nexample-model-name'} />
+                </div>
+              </div>
+            )}
           </div>
           {error && <div style={{ font: '500 13px/18px Inter', color: '#991b1b', background: '#fff5f5', border: '1px solid #fca5a5', borderRadius: 6, padding: '9px 12px' }}>{error}</div>}
         </div>

@@ -24,6 +24,7 @@ function normalizeProvider(provider: Partial<StoredProvider>, family: StoredProv
   const providerNumber = typeof provider.providerNumber === 'string' && /^P\d+$/.test(provider.providerNumber)
     ? provider.providerNumber
     : '';
+  const requestsPerMinute = Number(provider.rateLimits?.requestsPerMinute || 0);
   return {
     uuid: String(provider.uuid || randomUUID()),
     providerNumber,
@@ -41,6 +42,9 @@ function normalizeProvider(provider: Partial<StoredProvider>, family: StoredProv
     baseUrl: String(provider.baseUrl || (family === 'anthropic-custom' ? 'https://api.anthropic.com' : 'https://api.openai.com/v1')),
     apiKey: provider.apiKey || '',
     apiKeyMasked: provider.apiKey ? maskSecret(provider.apiKey) : String(provider.apiKeyMasked || ''),
+    rateLimits: {
+      requestsPerMinute: Number.isInteger(requestsPerMinute) && requestsPerMinute > 0 ? requestsPerMinute : undefined
+    },
     manualModels: Array.isArray(provider.manualModels) ? provider.manualModels.map(String).filter(Boolean) : [],
     models: []
   };
@@ -156,6 +160,10 @@ export async function saveProviderPools(pools: StoredProviderPool[]): Promise<St
     const seen = new Set<string>();
     for (const provider of pool.providers) {
       if (!provider.customName.trim()) throw new Error('Provider Custom Name is required.');
+      const rpm = provider.rateLimits?.requestsPerMinute;
+      if (rpm !== undefined && (!Number.isInteger(rpm) || rpm <= 0)) {
+        throw new Error(`Requests per minute must be a positive integer for provider: ${provider.customName}`);
+      }
       const key = provider.customName.toLowerCase();
       if (seen.has(key)) throw new Error(`Provider Custom Name must be unique inside ${pool.family}: ${provider.customName}`);
       seen.add(key);

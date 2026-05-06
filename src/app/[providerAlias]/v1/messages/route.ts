@@ -5,6 +5,7 @@ import { anthropicError } from '@/server/errors/api-errors';
 import { logRouteEvent } from '@/server/logging/route-logging';
 import { createAnthropicMessage } from '@/server/providers/anthropic-compatible-client';
 import { createOpenAIChatCompletion } from '@/server/providers/openai-compatible-client';
+import { acquireProviderRateLimit } from '@/server/rate-limits/rate-limit-service';
 import { ensureRuntimeJobs } from '@/server/runtime/runtime-jobs';
 import {
   translateAnthropicRequestToOpenAIChat,
@@ -58,6 +59,10 @@ export async function handleProviderAliasMessages(request: Request, providerAlia
       const provider = await findAnthropicProvider(parsed.alias);
       if (!provider) return anthropicError('Anthropic provider alias was not found.', 404, 'not_found_error');
       if (!provider.enabled) return anthropicError('Selected provider is disabled.', 503, 'api_error');
+      const rateLimit = acquireProviderRateLimit(provider);
+      if (!rateLimit.allowed) {
+        return anthropicError(rateLimit.reason || `Provider is currently rate-limited: ${provider.customName}`, 429, 'rate_limit_error');
+      }
 
       const { response, data } = await createAnthropicMessage(provider, body);
       await logRouteEvent({
@@ -77,6 +82,10 @@ export async function handleProviderAliasMessages(request: Request, providerAlia
     const provider = await findOpenAIProvider(parsed.alias);
     if (!provider) return anthropicError('OpenAI provider alias was not found.', 404, 'not_found_error');
     if (!provider.enabled) return anthropicError('Selected provider is disabled.', 503, 'api_error');
+    const rateLimit = acquireProviderRateLimit(provider);
+    if (!rateLimit.allowed) {
+      return anthropicError(rateLimit.reason || `Provider is currently rate-limited: ${provider.customName}`, 429, 'rate_limit_error');
+    }
 
     const translatedRequest = translateAnthropicRequestToOpenAIChat(body);
     if (translatedRequest.stream === true) {

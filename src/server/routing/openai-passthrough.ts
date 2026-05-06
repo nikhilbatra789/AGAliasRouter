@@ -6,6 +6,7 @@ import { logRouteEvent } from '@/server/logging/route-logging';
 import { updateProviderModelsCache } from '@/server/models/models-cache-service';
 import { createAnthropicMessage, fetchAnthropicModels } from '@/server/providers/anthropic-compatible-client';
 import { createOpenAIChatCompletion, fetchOpenAIModels } from '@/server/providers/openai-compatible-client';
+import { acquireProviderRateLimit } from '@/server/rate-limits/rate-limit-service';
 import { ensureRuntimeJobs } from '@/server/runtime/runtime-jobs';
 import {
   translateAnthropicResponseToOpenAIChatCompletion,
@@ -105,6 +106,11 @@ export async function handleOpenAIProviderChatCompletions(request: Request, prov
     }
     if (typeof body.n === 'number' && body.n > 1) {
       return openAIError('OpenAI n > 1 is not supported.', 400, 'invalid_request_error');
+    }
+
+    const rateLimit = acquireProviderRateLimit(provider);
+    if (!rateLimit.allowed) {
+      return openAIError(rateLimit.reason || `Provider is currently rate-limited: ${provider.customName}`, 429, 'rate_limit_error');
     }
 
     if (parsed.family === 'openai') {

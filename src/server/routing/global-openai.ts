@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { validateClientApiKey } from '@/server/auth/client-api-auth';
 import { openAIError } from '@/server/errors/api-errors';
 import { getGlobalOpenAIModels } from '@/server/models/models-cache-service';
-import { markRouteSelectionResult, resolveMappedModel } from '@/server/routing/model-router';
+import { markRouteSelectionResult, resolveMappedModel, RouteRateLimitError } from '@/server/routing/model-router';
 import { createOpenAIChatCompletion } from '@/server/providers/openai-compatible-client';
 import { createAnthropicMessage } from '@/server/providers/anthropic-compatible-client';
 import { logRouteEvent } from '@/server/logging/route-logging';
@@ -115,6 +115,10 @@ export async function handleGlobalOpenAIChatCompletions(request: Request) {
     return NextResponse.json(data, { status: response.status });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    if (error instanceof RouteRateLimitError) {
+      await logRouteEvent({ route: '/v1/chat/completions', status: 429, latencyMs: Date.now() - startedAt });
+      return openAIError(message, 429, 'rate_limit_error');
+    }
     const status = message.includes('must') || message.includes('not supported') || message.includes('Invalid JSON') ? 400 : 500;
     await logRouteEvent({ route: '/v1/chat/completions', status, latencyMs: Date.now() - startedAt });
     return openAIError(message, status, status === 400 ? 'invalid_request_error' : 'server_error');

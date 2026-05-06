@@ -60,6 +60,10 @@ export type ProviderModel = {
   source: 'api' | 'manual';
 };
 
+export type ProviderRateLimits = {
+  requestsPerMinute?: number;
+};
+
 export type Provider = {
   uuid: string;
   providerNumber?: string;
@@ -77,6 +81,7 @@ export type Provider = {
   baseUrl: string;
   apiKey?: string;
   apiKeyMasked: string;
+  rateLimits?: ProviderRateLimits;
   manualModels: string[];
   models: ProviderModel[];
 };

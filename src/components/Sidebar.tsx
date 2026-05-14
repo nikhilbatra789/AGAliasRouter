@@ -11,6 +11,7 @@ const navItems = [
   { href: '/configuration', icon: 'settings', label: 'Configuration' },
   { href: '/provider-pool', icon: 'account_tree', label: 'Provider Pools' },
   { href: '/model-mapping', icon: 'route', label: 'Model Mappings' },
+  { href: '/playground', icon: 'chat', label: 'Playground' },
   { href: '/credential-files', icon: 'key', label: 'Credential Files' },
   { href: '/real-time-logs', icon: 'terminal', label: 'Real-time Logs' }
 ];

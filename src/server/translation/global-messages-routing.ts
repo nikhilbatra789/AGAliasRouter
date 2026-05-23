@@ -2,6 +2,9 @@ import { createAnthropicMessage } from '@/server/providers/anthropic-compatible-
 import { createOpenAIChatCompletion } from '@/server/providers/openai-compatible-client';
 import { markRouteSelectionResult, resolveMappedModel } from '@/server/routing/model-router';
 import {
+  createAnthropicStreamError,
+  openAIStreamToAnthropic,
+  sanitizeStreamingForProvider,
   translateAnthropicRequestToOpenAIChat,
   translateOpenAIChatCompletionResponseToAnthropicMessage,
   type AnthropicMessagesRequest
@@ -17,19 +20,26 @@ export async function routeGlobalAnthropicMessagesRequest(request: AnthropicMess
     throw new Error(`Model alias was not found or has no available provider: ${request.model}`);
   }
 
+  const wantsStream = request.stream === true;
   if (selection.provider.family === 'anthropic-custom') {
+    const directBody = sanitizeStreamingForProvider({ ...request, model: selection.upstreamModelName }, selection.provider.supportsStreaming !== false);
     const { response, data } = await createAnthropicMessage(selection.provider, {
-      ...request,
-      model: selection.upstreamModelName
+      ...directBody
     });
     await markRouteSelectionResult(selection, response.status);
     return { data, status: response.status };
   }
 
-  const translatedRequest = translateAnthropicRequestToOpenAIChat({
+  const translatedRequest = sanitizeStreamingForProvider(translateAnthropicRequestToOpenAIChat({
     ...request,
     model: selection.upstreamModelName
-  });
+  }), selection.provider.supportsStreaming !== false);
+  if (wantsStream && translatedRequest.stream === true) {
+    const upstream = await createOpenAIChatCompletion(selection.provider, translatedRequest, { headers: { Accept: 'text/event-stream' } });
+    await markRouteSelectionResult(selection, upstream.response.status);
+    if (!upstream.response.ok) return { data: createAnthropicStreamError(`Upstream stream failed with status ${upstream.response.status}`), status: 200 };
+    return { data: openAIStreamToAnthropic(upstream.response, selection.upstreamModelName), status: 200 };
+  }
   const { response, data } = await createOpenAIChatCompletion(selection.provider, translatedRequest);
   await markRouteSelectionResult(selection, response.status);
   if (!response.ok) {

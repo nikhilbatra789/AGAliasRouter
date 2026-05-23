@@ -592,6 +592,20 @@ Translation runs when the selected provider family does not match the endpoint c
 
 The same rule applies to path-locked endpoints.
 
+### Streaming semantics
+
+- `stream: true` is supported across global and path-locked chat/messages endpoints.
+- Cross-family translation is streamed in both directions:
+  - Anthropic SSE -> OpenAI `chat.completion.chunk` stream.
+  - OpenAI SSE -> Anthropic `event:` stream.
+- Provider capability key: `supportsStreaming` (default `true`).
+  - If disabled, router strips streaming flags (`stream`, `stream_options`) and downgrades to non-stream mode.
+- OpenAI `stream_options.include_usage=true` emits a trailing usage chunk before `[DONE]` for Anthropic-backed translated streams.
+- Stream failures use immediate error payload + close:
+  - OpenAI shape: `data: {"error":{"message":"...","type":"api_error","code":"stream_error"}}`
+  - Anthropic shape: `event: error` + `data: {"type":"error","error":{"type":"api_error","message":"..."}}`
+- Health checks always force non-stream payloads.
+
 ### OpenAI Chat Request to Anthropic Messages
 
 The OpenAI-to-Anthropic adapter:

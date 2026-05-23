@@ -8,6 +8,10 @@ import { createAnthropicMessage } from '@/server/providers/anthropic-compatible-
 import { logRouteEvent } from '@/server/logging/route-logging';
 import { ensureRuntimeJobs } from '@/server/runtime/runtime-jobs';
 import {
+  anthropicStreamToOpenAI,
+  createOpenAIStreamError,
+  relayOpenAIStream,
+  sanitizeStreamingForProvider,
   translateAnthropicResponseToOpenAIChatCompletion,
   translateOpenAIChatRequestToAnthropic,
   type OpenAIChatCompletionsRequest
@@ -53,7 +57,7 @@ export async function handleGlobalOpenAIChatCompletions(request: Request) {
 
     const body = (await request.json().catch(() => null)) as (OpenAIChatCompletionsRequest & { stream?: unknown }) | null;
     if (!body || typeof body !== 'object') return openAIError('Request body must be valid JSON.', 400);
-    if (body.stream === true) return openAIError('Streaming is not supported in v1.', 400, 'unsupported_feature');
+    const wantsStream = body.stream === true;
     if (typeof body.temperature === 'number' && body.temperature > 1) {
       return openAIError('temperature must be <= 1.', 400, 'invalid_request_error');
     }
@@ -69,7 +73,19 @@ export async function handleGlobalOpenAIChatCompletions(request: Request) {
         return openAIError(`Model alias was not found or has no available provider: ${body.model}`, 404, 'model_not_found');
       }
       if (providerSelection.provider.family === 'anthropic-custom') {
-        const anthropicBody = translateOpenAIChatRequestToAnthropic({ ...body, model: providerSelection.upstreamModelName });
+        const anthropicBody = sanitizeStreamingForProvider(
+          translateOpenAIChatRequestToAnthropic({ ...body, model: providerSelection.upstreamModelName }),
+          providerSelection.provider.supportsStreaming !== false
+        );
+        if (wantsStream && anthropicBody.stream === true) {
+          const upstream = await createAnthropicMessage(providerSelection.provider, anthropicBody);
+          if (!upstream.response.ok) return createOpenAIStreamError(`Upstream stream failed with status ${upstream.response.status}`);
+          return anthropicStreamToOpenAI(
+            upstream.response,
+            providerSelection.upstreamModelName,
+            Boolean((body as { stream_options?: { include_usage?: boolean } }).stream_options?.include_usage)
+          );
+        }
         const { response, data } = await createAnthropicMessage(providerSelection.provider, anthropicBody);
         if (!response.ok) {
           await logRouteEvent({
@@ -100,7 +116,13 @@ export async function handleGlobalOpenAIChatCompletions(request: Request) {
         return NextResponse.json(translatedData, { status: response.status });
       }
 
-      const { response, data } = await createOpenAIChatCompletion(providerSelection.provider, { ...body, model: providerSelection.upstreamModelName });
+      const openAiBody = sanitizeStreamingForProvider({ ...body, model: providerSelection.upstreamModelName }, providerSelection.provider.supportsStreaming !== false);
+      if (wantsStream && openAiBody.stream === true) {
+        const upstream = await createOpenAIChatCompletion(providerSelection.provider, openAiBody, { headers: { Accept: 'text/event-stream' } });
+        if (!upstream.response.ok) return createOpenAIStreamError(`Upstream stream failed with status ${upstream.response.status}`);
+        return relayOpenAIStream(upstream.response);
+      }
+      const { response, data } = await createOpenAIChatCompletion(providerSelection.provider, openAiBody);
       await logRouteEvent({
         route: '/v1/chat/completions',
         status: response.status,
@@ -116,7 +138,19 @@ export async function handleGlobalOpenAIChatCompletions(request: Request) {
     }
 
     if (selection.provider.family === 'anthropic-custom') {
-      const anthropicBody = translateOpenAIChatRequestToAnthropic({ ...body, model: selection.upstreamModelName });
+      const anthropicBody = sanitizeStreamingForProvider(
+        translateOpenAIChatRequestToAnthropic({ ...body, model: selection.upstreamModelName }),
+        selection.provider.supportsStreaming !== false
+      );
+      if (wantsStream && anthropicBody.stream === true) {
+        const upstream = await createAnthropicMessage(selection.provider, anthropicBody);
+        if (!upstream.response.ok) return createOpenAIStreamError(`Upstream stream failed with status ${upstream.response.status}`);
+        return anthropicStreamToOpenAI(
+          upstream.response,
+          selection.upstreamModelName,
+          Boolean((body as { stream_options?: { include_usage?: boolean } }).stream_options?.include_usage)
+        );
+      }
       const { response, data } = await createAnthropicMessage(selection.provider, anthropicBody);
       if (!response.ok) {
         await logRouteEvent({
@@ -149,7 +183,13 @@ export async function handleGlobalOpenAIChatCompletions(request: Request) {
       return translated;
     }
 
-    const { response, data } = await createOpenAIChatCompletion(selection.provider, { ...body, model: selection.upstreamModelName });
+    const openAiBody = sanitizeStreamingForProvider({ ...body, model: selection.upstreamModelName }, selection.provider.supportsStreaming !== false);
+    if (wantsStream && openAiBody.stream === true) {
+      const upstream = await createOpenAIChatCompletion(selection.provider, openAiBody, { headers: { Accept: 'text/event-stream' } });
+      if (!upstream.response.ok) return createOpenAIStreamError(`Upstream stream failed with status ${upstream.response.status}`);
+      return relayOpenAIStream(upstream.response);
+    }
+    const { response, data } = await createOpenAIChatCompletion(selection.provider, openAiBody);
     await markRouteSelectionResult(selection, response.status);
     await logRouteEvent({
       route: '/v1/chat/completions',

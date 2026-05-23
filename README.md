@@ -368,12 +368,29 @@ Translation is used when the selected provider family does not match the endpoin
 
 Current constraints:
 
-- Streaming is not supported.
+- Streaming is not supported in the current release.
 - `temperature` must be less than or equal to `1`.
 - OpenAI `n` must be less than or equal to `1`.
 - OpenAI tool call `function.arguments` must be valid JSON when translating to Anthropic.
 - OpenAI `function` role messages are supported.
 - `response_format` is passed through by the translation layer.
+
+### Queued streaming feature (planned)
+
+A queued P0 task (`TASK-2026-05-14-002`) tracks end-to-end streaming support with provider capability controls.
+
+Planned behavior:
+- Streaming support for global + path-locked:
+  - OpenAI-compatible `/v1/chat/completions`
+  - Anthropic-compatible `/v1/messages`
+- Cross-family stream translation (OpenAI ↔ Anthropic)
+- Provider-level toggle `supportsStreaming`
+- Graceful downgrade when `supportsStreaming=false`:
+  - Drop stream flags
+  - Continue as non-stream (no hard error)
+- Playground streaming toggle
+- Immediate stream error event/chunk + close semantics
+- Health-check jobs and health endpoints always force non-stream
 
 ## Logs
 

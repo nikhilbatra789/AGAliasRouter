@@ -5,6 +5,7 @@ const labels: Record<string, string> = {
   '/configuration': 'Configuration',
   '/provider-pool': 'Provider Pools',
   '/model-mapping': 'Model Mappings',
+  '/playground': 'Playground',
   '/credential-files': 'Credential Files',
   '/real-time-logs': 'Real-time Logs'
 };

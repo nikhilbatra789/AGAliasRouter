@@ -1786,6 +1786,145 @@ export function CredentialFilesPage() {
   );
 }
 
+type PlaygroundRole = 'user' | 'assistant' | 'error';
+
+type PlaygroundMessage = {
+  id: string;
+  role: PlaygroundRole;
+  text: string;
+};
+
+export function PlaygroundPage() {
+  const [apiKey, setApiKey] = useState('');
+  const [models, setModels] = useState<string[]>([]);
+  const [selectedModel, setSelectedModel] = useState('');
+  const [messages, setMessages] = useState<PlaygroundMessage[]>([]);
+  const [prompt, setPrompt] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [lastUserPrompt, setLastUserPrompt] = useState('');
+  const [lastPromptModel, setLastPromptModel] = useState('');
+
+  useEffect(() => {
+    adminApi.config().then((configResponse) => {
+      if (!configResponse.ok) return;
+      const key = configResponse.data.sharedApiKey;
+      setApiKey(key);
+      fetch('/v1/models', {
+        headers: {
+          Authorization: `Bearer ${key}`
+        }
+      })
+        .then((response) => response.json())
+        .then((payload) => {
+          const modelIds = Array.isArray(payload?.data)
+            ? payload.data
+              .map((item: { id?: unknown }) => (typeof item?.id === 'string' ? item.id : ''))
+              .filter(Boolean)
+            : [];
+          setModels(modelIds);
+          setSelectedModel('');
+        })
+        .catch(() => {
+          setModels([]);
+          setSelectedModel('');
+        });
+    });
+  }, []);
+
+  async function sendMessage(promptText: string, model: string) {
+    if (!promptText.trim() || !model || isLoading || !apiKey) return;
+    const userText = promptText.trim();
+    setLastUserPrompt(userText);
+    setLastPromptModel(model);
+    setMessages((current) => [...current, { id: genId('user'), role: 'user', text: userText }]);
+    setPrompt('');
+    setIsLoading(true);
+    try {
+      const response = await fetch('/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: 'user', content: userText }],
+          stream: false
+        })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const errorText = typeof data?.error?.message === 'string' ? data.error.message : 'Request failed.';
+        setMessages((current) => [...current, { id: genId('error'), role: 'error', text: errorText }]);
+        return;
+      }
+      const assistantText = typeof data?.choices?.[0]?.message?.content === 'string'
+        ? data.choices[0].message.content
+        : 'No assistant response returned.';
+      setMessages((current) => [...current, { id: genId('assistant'), role: 'assistant', text: assistantText }]);
+    } catch (error) {
+      setMessages((current) => [...current, { id: genId('error'), role: 'error', text: error instanceof Error ? error.message : 'Request failed.' }]);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  return (
+    <div style={{ maxWidth: 980, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <PageTitle>Playground</PageTitle>
+      <div style={{ background: '#fff', border: '1px solid #c2c6d1', borderRadius: 8, padding: 16, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <label htmlFor="playground-model" style={{ font: '500 12px/16px "Space Grotesk"', letterSpacing: '.04em', textTransform: 'uppercase', color: '#737781' }}>Model</label>
+        <select
+          id="playground-model"
+          value={selectedModel}
+          onChange={(event) => setSelectedModel(event.target.value)}
+          disabled={isLoading || models.length === 0}
+          style={{ minWidth: 280, flex: 1, background: '#fff', border: '1px solid #c2c6d1', borderRadius: 6, padding: '10px 12px', font: '500 13px/18px Inter', color: '#191c1e' }}
+        >
+          <option value="">{models.length === 0 ? 'No models available' : 'Select your model'}</option>
+          {models.map((model) => <option key={model} value={model}>{model}</option>)}
+        </select>
+      </div>
+
+      <div style={{ background: '#fff', border: '1px solid #c2c6d1', borderRadius: 8, minHeight: 360, maxHeight: '58vh', overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {messages.length === 0 && <div style={{ color: '#737781', font: '400 13px/18px Inter' }}>Start by selecting a model and sending a message.</div>}
+        {messages.map((message) => {
+          const isUser = message.role === 'user';
+          const isError = message.role === 'error';
+          return (
+            <div key={message.id} style={{ display: 'flex', justifyContent: isUser ? 'flex-end' : 'flex-start' }}>
+              <div style={{ maxWidth: '80%', background: isError ? '#fff5f5' : isUser ? '#0f457c' : '#f2f4f6', color: isError ? '#991b1b' : isUser ? '#fff' : '#191c1e', border: `1px solid ${isError ? '#fca5a5' : isUser ? '#0f457c' : '#d6d9de'}`, borderRadius: 12, padding: '10px 12px', whiteSpace: 'pre-wrap', font: '400 13px/20px Inter' }}>
+                {message.text}
+                {isError && (
+                  <div style={{ marginTop: 8 }}>
+                    <Button variant="ghost" icon="refresh" onClick={() => void sendMessage(lastUserPrompt, lastPromptModel || selectedModel)} disabled={isLoading || !lastUserPrompt || !(lastPromptModel || selectedModel)}>
+                      Retry
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+        <textarea
+          value={prompt}
+          onChange={(event) => setPrompt(event.target.value)}
+          placeholder="Type a prompt..."
+          rows={3}
+          disabled={isLoading || !selectedModel}
+          style={{ flex: 1, resize: 'vertical', minHeight: 72, maxHeight: 220, background: '#fff', border: '1px solid #c2c6d1', borderRadius: 8, padding: '10px 12px', font: '400 13px/20px Inter', color: '#191c1e' }}
+        />
+        <Button variant="primary" icon="send" disabled={isLoading || !prompt.trim() || !selectedModel} onClick={() => void sendMessage(prompt, selectedModel)}>
+          {isLoading ? 'Sending…' : 'Send'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function RealtimeLogsPage() {
   const [logs, setLogs] = useState<LogEvent[]>([]);
   const [paused, setPaused] = useState(false);

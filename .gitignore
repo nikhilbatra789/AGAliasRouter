@@ -14,3 +14,11 @@ playwright-report/
 # Runtime local state (do not commit secrets or local logs)
 /config/
 /logs/
+
+# Local agent/docs artifacts
+.codex/
+FEATURE_DOC.md
+PENDING_TASKS.md
+PROJECT_STRUCTURE.md
+TIMELINE.md
+UI_GUIDELINES.md

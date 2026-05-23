@@ -2,6 +2,8 @@ import { expect, test } from '@playwright/test';
 
 async function login(page: import('@playwright/test').Page) {
   await page.goto('/login');
+  await page.getByPlaceholder('admin@gmail.com').fill('admin@gmail.com');
+  await page.getByPlaceholder('Password').fill('123456');
   await page.getByRole('button', { name: 'Login' }).click();
   await expect(page).toHaveURL(/\/dashboard/);
 }

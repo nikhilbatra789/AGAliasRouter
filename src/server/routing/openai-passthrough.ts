@@ -9,6 +9,10 @@ import { createOpenAIChatCompletion, fetchOpenAIModels } from '@/server/provider
 import { acquireProviderRateLimit } from '@/server/rate-limits/rate-limit-service';
 import { ensureRuntimeJobs } from '@/server/runtime/runtime-jobs';
 import {
+  anthropicStreamToOpenAI,
+  createOpenAIStreamError,
+  relayOpenAIStream,
+  sanitizeStreamingForProvider,
   translateAnthropicResponseToOpenAIChatCompletion,
   translateOpenAIChatRequestToAnthropic,
   type OpenAIChatCompletionsRequest
@@ -100,7 +104,7 @@ export async function handleOpenAIProviderChatCompletions(request: Request, prov
       | ({ stream?: unknown; temperature?: unknown; n?: unknown } & Record<string, unknown>)
       | null;
     if (!body || typeof body !== 'object') return openAIError('Request body must be valid JSON.', 400);
-    if (body.stream === true) return openAIError('Streaming is not supported in v1.', 400, 'unsupported_feature');
+    const wantsStream = body.stream === true;
     if (typeof body.temperature === 'number' && body.temperature > 1) {
       return openAIError('temperature must be <= 1.', 400, 'invalid_request_error');
     }
@@ -114,7 +118,13 @@ export async function handleOpenAIProviderChatCompletions(request: Request, prov
     }
 
     if (parsed.family === 'openai') {
-      const { response, data } = await createOpenAIChatCompletion(provider, body);
+      const openAiBody = sanitizeStreamingForProvider(body, provider.supportsStreaming !== false);
+      if (wantsStream && openAiBody.stream === true) {
+        const upstream = await createOpenAIChatCompletion(provider, openAiBody, { headers: { Accept: 'text/event-stream' } });
+        if (!upstream.response.ok) return createOpenAIStreamError(`Upstream stream failed with status ${upstream.response.status}`);
+        return relayOpenAIStream(upstream.response);
+      }
+      const { response, data } = await createOpenAIChatCompletion(provider, openAiBody);
       await logRouteEvent({
         route: `/${providerAliasSegment}/v1/chat/completions`,
         status: response.status,
@@ -128,9 +138,18 @@ export async function handleOpenAIProviderChatCompletions(request: Request, prov
       return NextResponse.json(data, { status: response.status });
     }
 
-    const anthropicBody = translateOpenAIChatRequestToAnthropic(body as OpenAIChatCompletionsRequest);
-    if (anthropicBody.stream === true) {
-      return openAIError('Streaming is not supported in v1.', 400, 'unsupported_feature');
+    const anthropicBody = sanitizeStreamingForProvider(
+      translateOpenAIChatRequestToAnthropic(body as OpenAIChatCompletionsRequest),
+      provider.supportsStreaming !== false
+    );
+    if (wantsStream && anthropicBody.stream === true) {
+      const upstream = await createAnthropicMessage(provider, anthropicBody);
+      if (!upstream.response.ok) return createOpenAIStreamError(`Upstream stream failed with status ${upstream.response.status}`);
+      return anthropicStreamToOpenAI(
+        upstream.response,
+        String(anthropicBody.model || ''),
+        Boolean((body as { stream_options?: { include_usage?: boolean } }).stream_options?.include_usage)
+      );
     }
 
     const { response, data } = await createAnthropicMessage(provider, anthropicBody);

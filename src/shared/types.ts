@@ -82,6 +82,7 @@ export type Provider = {
   apiKey?: string;
   apiKeyMasked: string;
   rateLimits?: ProviderRateLimits;
+  supportsStreaming?: boolean;
   manualModels: string[];
   models: ProviderModel[];
 };

@@ -45,6 +45,7 @@ function normalizeProvider(provider: Partial<StoredProvider>, family: StoredProv
     rateLimits: {
       requestsPerMinute: Number.isInteger(requestsPerMinute) && requestsPerMinute > 0 ? requestsPerMinute : undefined
     },
+    supportsStreaming: provider.supportsStreaming !== false,
     manualModels: Array.isArray(provider.manualModels) ? provider.manualModels.map(String).filter(Boolean) : [],
     models: []
   };

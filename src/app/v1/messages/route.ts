@@ -21,11 +21,8 @@ export async function POST(request: Request) {
     if (!body || typeof body !== 'object') {
       return anthropicError('Request body must be valid JSON.', 400, 'invalid_request_error');
     }
-    if (body.stream === true) {
-      return anthropicError('Streaming is not supported in v1.', 400, 'invalid_request_error');
-    }
-
     const { data, status } = await routeGlobalAnthropicMessagesRequest(body);
+    if (data instanceof Response) return data;
     await logRouteEvent({
       route: '/v1/messages',
       status,

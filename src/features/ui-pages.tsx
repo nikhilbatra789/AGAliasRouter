@@ -677,6 +677,7 @@ function ProviderModal({ pool, initial, onClose, onSave }: { pool: ProviderPool;
     apiKey: '',
     apiKeyMasked: '',
     rateLimits: {},
+    supportsStreaming: true,
     manualModels: [],
     models: []
   };
@@ -775,6 +776,16 @@ function ProviderModal({ pool, initial, onClose, onSave }: { pool: ProviderPool;
               <div style={labelStyle}>Health Check</div>
               <div style={{ position: 'relative' }}>
                 <select style={{ ...inputStyle, cursor: 'pointer', appearance: 'none', paddingRight: 36 }} value={form.enabled ? 'Enabled' : 'Disabled'} onChange={(event) => setForm({ ...form, enabled: event.target.value === 'Enabled' })}>
+                  <option>Enabled</option>
+                  <option>Disabled</option>
+                </select>
+                <span className="material-symbols-outlined" style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', fontSize: 18, color: '#424750' }}>expand_more</span>
+              </div>
+            </div>
+            <div>
+              <div style={labelStyle}>Streaming</div>
+              <div style={{ position: 'relative' }}>
+                <select style={{ ...inputStyle, cursor: 'pointer', appearance: 'none', paddingRight: 36 }} value={form.supportsStreaming === false ? 'Disabled' : 'Enabled'} onChange={(event) => setForm({ ...form, supportsStreaming: event.target.value === 'Enabled' })}>
                   <option>Enabled</option>
                   <option>Disabled</option>
                 </select>

@@ -8,6 +8,10 @@ import { createOpenAIChatCompletion } from '@/server/providers/openai-compatible
 import { acquireProviderRateLimit } from '@/server/rate-limits/rate-limit-service';
 import { ensureRuntimeJobs } from '@/server/runtime/runtime-jobs';
 import {
+  createAnthropicStreamError,
+  openAIStreamToAnthropic,
+  relayOpenAIStream,
+  sanitizeStreamingForProvider,
   translateAnthropicRequestToOpenAIChat,
   translateOpenAIChatCompletionResponseToAnthropicMessage,
   type AnthropicMessagesRequest
@@ -48,9 +52,7 @@ export async function handleProviderAliasMessages(request: Request, providerAlia
     if (!body || typeof body !== 'object') {
       return anthropicError('Request body must be valid JSON.', 400, 'invalid_request_error');
     }
-    if (body.stream === true) {
-      return anthropicError('Streaming is not supported in v1.', 400, 'invalid_request_error');
-    }
+    const wantsStream = body.stream === true;
     if (typeof body.temperature === 'number' && body.temperature > 1) {
       return anthropicError('temperature must be <= 1.', 400, 'invalid_request_error');
     }
@@ -64,7 +66,13 @@ export async function handleProviderAliasMessages(request: Request, providerAlia
         return anthropicError(rateLimit.reason || `Provider is currently rate-limited: ${provider.customName}`, 429, 'rate_limit_error');
       }
 
-      const { response, data } = await createAnthropicMessage(provider, body);
+      const reqBody = sanitizeStreamingForProvider(body as Record<string, unknown>, provider.supportsStreaming !== false);
+      if (wantsStream && reqBody.stream === true) {
+        const upstream = await createAnthropicMessage(provider, reqBody);
+        if (!upstream.response.ok) return createAnthropicStreamError(`Upstream stream failed with status ${upstream.response.status}`);
+        return relayOpenAIStream(upstream.response);
+      }
+      const { response, data } = await createAnthropicMessage(provider, reqBody);
       await logRouteEvent({
         route: `/${providerAlias}/v1/messages`,
         status: response.status,
@@ -87,9 +95,11 @@ export async function handleProviderAliasMessages(request: Request, providerAlia
       return anthropicError(rateLimit.reason || `Provider is currently rate-limited: ${provider.customName}`, 429, 'rate_limit_error');
     }
 
-    const translatedRequest = translateAnthropicRequestToOpenAIChat(body);
-    if (translatedRequest.stream === true) {
-      return anthropicError('Streaming is not supported in v1.', 400, 'invalid_request_error');
+    const translatedRequest = sanitizeStreamingForProvider(translateAnthropicRequestToOpenAIChat(body), provider.supportsStreaming !== false);
+    if (wantsStream && translatedRequest.stream === true) {
+      const upstream = await createOpenAIChatCompletion(provider, translatedRequest, { headers: { Accept: 'text/event-stream' } });
+      if (!upstream.response.ok) return createAnthropicStreamError(`Upstream stream failed with status ${upstream.response.status}`);
+      return openAIStreamToAnthropic(upstream.response, String(translatedRequest.model || body.model));
     }
 
     const { response, data } = await createOpenAIChatCompletion(provider, translatedRequest);

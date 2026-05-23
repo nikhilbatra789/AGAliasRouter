@@ -22,7 +22,7 @@ export async function routeGlobalAnthropicMessagesRequest(request: AnthropicMess
 
   const wantsStream = request.stream === true;
   if (selection.provider.family === 'anthropic-custom') {
-    const directBody = sanitizeStreamingForProvider({ ...request, model: selection.upstreamModelName }, selection.provider.supportsStreaming !== false);
+    const directBody = sanitizeStreamingForProvider({ ...request, model: selection.upstreamModelName }, selection.provider.supportsStreaming === true);
     const { response, data } = await createAnthropicMessage(selection.provider, {
       ...directBody
     });
@@ -33,7 +33,7 @@ export async function routeGlobalAnthropicMessagesRequest(request: AnthropicMess
   const translatedRequest = sanitizeStreamingForProvider(translateAnthropicRequestToOpenAIChat({
     ...request,
     model: selection.upstreamModelName
-  }), selection.provider.supportsStreaming !== false);
+  }), selection.provider.supportsStreaming === true);
   if (wantsStream && translatedRequest.stream === true) {
     const upstream = await createOpenAIChatCompletion(selection.provider, translatedRequest, { headers: { Accept: 'text/event-stream' } });
     await markRouteSelectionResult(selection, upstream.response.status);

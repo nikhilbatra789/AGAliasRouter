@@ -131,9 +131,7 @@ async function runProviderCheck(provider: ProviderPool['providers'][number], che
           provider,
           {
             model: provider.checkModelName,
-            messages: [{ role: 'user', content: 'Hi' }],
-            max_tokens: 1,
-            temperature: 0
+            messages: [{ role: 'user', content: 'Hi' }]
           },
           timeoutSignal(timeoutMs)
         );
@@ -194,9 +192,7 @@ async function runModelCheck(
           provider,
           {
             model: modelName,
-            messages: [{ role: 'user', content: 'Hi' }],
-            max_tokens: 1,
-            temperature: 0
+            messages: [{ role: 'user', content: 'Hi' }]
           },
           timeoutSignal(timeoutMs)
         );

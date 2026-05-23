@@ -118,7 +118,7 @@ export async function handleOpenAIProviderChatCompletions(request: Request, prov
     }
 
     if (parsed.family === 'openai') {
-      const openAiBody = sanitizeStreamingForProvider(body, provider.supportsStreaming !== false);
+      const openAiBody = sanitizeStreamingForProvider(body, provider.supportsStreaming === true);
       if (wantsStream && openAiBody.stream === true) {
         const upstream = await createOpenAIChatCompletion(provider, openAiBody, { headers: { Accept: 'text/event-stream' } });
         if (!upstream.response.ok) return createOpenAIStreamError(`Upstream stream failed with status ${upstream.response.status}`);
@@ -140,7 +140,7 @@ export async function handleOpenAIProviderChatCompletions(request: Request, prov
 
     const anthropicBody = sanitizeStreamingForProvider(
       translateOpenAIChatRequestToAnthropic(body as OpenAIChatCompletionsRequest),
-      provider.supportsStreaming !== false
+      provider.supportsStreaming === true
     );
     if (wantsStream && anthropicBody.stream === true) {
       const upstream = await createAnthropicMessage(provider, anthropicBody);

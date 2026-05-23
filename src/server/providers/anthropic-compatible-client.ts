@@ -10,6 +10,10 @@ function joinUrl(baseUrl: string, endpoint: string) {
   return `${apiBase}/${endpoint.replace(/^\/+/, '')}`;
 }
 
+function isStreamingBody(body: unknown) {
+  return Boolean(body && typeof body === 'object' && (body as { stream?: unknown }).stream === true);
+}
+
 function createAnthropicHeaders(provider: AnthropicProvider) {
   return {
     'x-api-key': provider.apiKey || '',
@@ -62,6 +66,9 @@ export async function createAnthropicMessage(provider: AnthropicProvider, body: 
     headers: createAnthropicHeaders(provider),
     body: JSON.stringify(body)
   });
+  if (isStreamingBody(body)) {
+    return { response, data: {} };
+  }
   const data = await response.json().catch(() => ({}));
   return { response, data };
 }

@@ -677,7 +677,7 @@ function ProviderModal({ pool, initial, onClose, onSave }: { pool: ProviderPool;
     apiKey: '',
     apiKeyMasked: '',
     rateLimits: {},
-    supportsStreaming: true,
+    supportsStreaming: false,
     manualModels: [],
     models: []
   };
@@ -1794,15 +1794,30 @@ type PlaygroundMessage = {
   text: string;
 };
 
+type PlaygroundModelOption = {
+  id: string;
+  provider: string;
+};
+
 export function PlaygroundPage() {
   const [apiKey, setApiKey] = useState('');
-  const [models, setModels] = useState<string[]>([]);
+  const [models, setModels] = useState<PlaygroundModelOption[]>([]);
   const [selectedModel, setSelectedModel] = useState('');
   const [messages, setMessages] = useState<PlaygroundMessage[]>([]);
   const [prompt, setPrompt] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [lastUserPrompt, setLastUserPrompt] = useState('');
   const [lastPromptModel, setLastPromptModel] = useState('');
+  const modelOptions = useMemo(() => {
+    if (!models.length) return [{ value: '', label: 'No models available' }];
+    return [
+      { value: '', label: 'Select your model' },
+      ...models.map((model) => ({
+        value: model.id,
+        label: model.provider ? `${model.provider} - ${model.id}` : model.id
+      }))
+    ];
+  }, [models]);
 
   useEffect(() => {
     adminApi.config().then((configResponse) => {
@@ -1816,12 +1831,15 @@ export function PlaygroundPage() {
       })
         .then((response) => response.json())
         .then((payload) => {
-          const modelIds = Array.isArray(payload?.data)
+          const modelRows: PlaygroundModelOption[] = Array.isArray(payload?.data)
             ? payload.data
-              .map((item: { id?: unknown }) => (typeof item?.id === 'string' ? item.id : ''))
-              .filter(Boolean)
+              .map((item: { id?: unknown; provider?: unknown }) => ({
+                id: typeof item?.id === 'string' ? item.id : '',
+                provider: typeof item?.provider === 'string' ? item.provider : ''
+              }))
+              .filter((item: PlaygroundModelOption) => item.id)
             : [];
-          setModels(modelIds);
+          setModels(modelRows);
           setSelectedModel('');
         })
         .catch(() => {
@@ -1874,16 +1892,15 @@ export function PlaygroundPage() {
       <PageTitle>Playground</PageTitle>
       <div style={{ background: '#fff', border: '1px solid #c2c6d1', borderRadius: 8, padding: 16, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <label htmlFor="playground-model" style={{ font: '500 12px/16px "Space Grotesk"', letterSpacing: '.04em', textTransform: 'uppercase', color: '#737781' }}>Model</label>
-        <select
-          id="playground-model"
-          value={selectedModel}
-          onChange={(event) => setSelectedModel(event.target.value)}
-          disabled={isLoading || models.length === 0}
-          style={{ minWidth: 280, flex: 1, background: '#fff', border: '1px solid #c2c6d1', borderRadius: 6, padding: '10px 12px', font: '500 13px/18px Inter', color: '#191c1e' }}
-        >
-          <option value="">{models.length === 0 ? 'No models available' : 'Select your model'}</option>
-          {models.map((model) => <option key={model} value={model}>{model}</option>)}
-        </select>
+        <div id="playground-model" style={{ minWidth: 280, flex: 1 }}>
+          <SearchableSelect
+            value={selectedModel}
+            onChange={setSelectedModel}
+            options={modelOptions}
+            disabled={isLoading || models.length === 0}
+            placeholder="Search models"
+          />
+        </div>
       </div>
 
       <div style={{ background: '#fff', border: '1px solid #c2c6d1', borderRadius: 8, minHeight: 360, maxHeight: '58vh', overflowY: 'auto', padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>

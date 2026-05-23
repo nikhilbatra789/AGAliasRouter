@@ -66,7 +66,7 @@ export async function handleProviderAliasMessages(request: Request, providerAlia
         return anthropicError(rateLimit.reason || `Provider is currently rate-limited: ${provider.customName}`, 429, 'rate_limit_error');
       }
 
-      const reqBody = sanitizeStreamingForProvider(body as Record<string, unknown>, provider.supportsStreaming !== false);
+      const reqBody = sanitizeStreamingForProvider(body as Record<string, unknown>, provider.supportsStreaming === true);
       if (wantsStream && reqBody.stream === true) {
         const upstream = await createAnthropicMessage(provider, reqBody);
         if (!upstream.response.ok) return createAnthropicStreamError(`Upstream stream failed with status ${upstream.response.status}`);
@@ -95,7 +95,7 @@ export async function handleProviderAliasMessages(request: Request, providerAlia
       return anthropicError(rateLimit.reason || `Provider is currently rate-limited: ${provider.customName}`, 429, 'rate_limit_error');
     }
 
-    const translatedRequest = sanitizeStreamingForProvider(translateAnthropicRequestToOpenAIChat(body), provider.supportsStreaming !== false);
+    const translatedRequest = sanitizeStreamingForProvider(translateAnthropicRequestToOpenAIChat(body), provider.supportsStreaming === true);
     if (wantsStream && translatedRequest.stream === true) {
       const upstream = await createOpenAIChatCompletion(provider, translatedRequest, { headers: { Accept: 'text/event-stream' } });
       if (!upstream.response.ok) return createAnthropicStreamError(`Upstream stream failed with status ${upstream.response.status}`);

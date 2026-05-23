@@ -6,6 +6,10 @@ function joinUrl(baseUrl: string, endpoint: string) {
   return `${baseUrl.replace(/\/+$/, '')}/${endpoint.replace(/^\/+/, '')}`;
 }
 
+function isStreamingBody(body: unknown) {
+  return Boolean(body && typeof body === 'object' && (body as { stream?: unknown }).stream === true);
+}
+
 function extractOpenAIModelRows(data: unknown): Array<Record<string, unknown>> {
   const normalizeRow = (row: unknown): Record<string, unknown> | null => {
     if (!row) return null;
@@ -93,6 +97,9 @@ export async function createOpenAIChatCompletion(provider: OpenAIProvider, body:
     },
     body: JSON.stringify(body)
   });
+  if (isStreamingBody(body)) {
+    return { response, data: {} };
+  }
   const data = await response.json().catch(() => ({}));
   return { response, data };
 }
